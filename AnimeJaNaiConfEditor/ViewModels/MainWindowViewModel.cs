@@ -157,18 +157,18 @@ namespace AnimeJaNaiConfEditor.ViewModels
             var lines = string.Join("\n",
                 missing.Select(p => $"\u2022  {p.Title} \u2014 {p.SizeText}"));
             long totalMb = missing.Sum(p => p.Bytes) / 1048576;
-            var dialog = new FluentAvalonia.UI.Controls.ContentDialog
+            var dialog = new FluentAvalonia.UI.Controls.FAContentDialog
             {
                 Title = "Set up AnimeJaNai",
                 Content = $"Components recommended for this PC are not installed:\n\n{lines}\n\nDownload and install them now ({totalMb:N0} MB)?",
                 PrimaryButtonText = "Install",
                 CloseButtonText = "Not now",
-                DefaultButton = FluentAvalonia.UI.Controls.ContentDialogButton.Primary,
+                DefaultButton = FluentAvalonia.UI.Controls.FAContentDialogButton.Primary,
             };
             try
             {
                 var result = await dialog.ShowAsync();
-                if (result == FluentAvalonia.UI.Controls.ContentDialogResult.Primary)
+                if (result == FluentAvalonia.UI.Controls.FAContentDialogResult.Primary)
                 {
                     await ComponentManager.InstallMissingPreselectedAsync();
                 }

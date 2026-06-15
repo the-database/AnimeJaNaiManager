@@ -349,11 +349,11 @@
                               <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10">
                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">FPS Range</TextBlock>
-                                  <ui:NumberBox IsEnabled="False" Margin="0,0,5,0" Value="{Binding MinFps}" Minimum="0" Maximum="999" Width="80" />
+                                  <ui:FANumberBox IsEnabled="False" Margin="0,0,5,0" Value="{Binding MinFps}" Minimum="0" Maximum="999" Width="80" />
                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">fps</TextBlock>
 
                                   <TextBlock Margin="10,0,20,0" VerticalAlignment="Center"> - </TextBlock>
-                                  <ui:NumberBox IsEnabled="False" Margin="0,0,5,0" Value="{Binding MaxFps}" Minimum="0" Maximum="999" Width="80" />
+                                  <ui:FANumberBox IsEnabled="False" Margin="0,0,5,0" Value="{Binding MaxFps}" Minimum="0" Maximum="999" Width="80" />
                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">fps</TextBlock>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0">Range of video fps (frames per second) to activate this chain. Higher fps videos require more processing power to upscale. A maximum fps of 0 means the chain will run on all video fps.</TextBlock>
@@ -538,11 +538,11 @@
                                 <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10">
                                   <StackPanel Grid.Column="0" Orientation="Horizontal">
                                     <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">FPS Range</TextBlock>
-                                    <ui:NumberBox Margin="0,0,5,0" Value="{Binding MinFps}" Minimum="0" Maximum="999" Width="80" />
+                                    <ui:FANumberBox Margin="0,0,5,0" Value="{Binding MinFps}" Minimum="0" Maximum="999" Width="80" />
                                     <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">fps</TextBlock>
 
                                     <TextBlock Margin="10,0,20,0" VerticalAlignment="Center"> - </TextBlock>
-                                    <ui:NumberBox Margin="0,0,5,0" Value="{Binding MaxFps}" Minimum="0" Maximum="999" Width="80" />
+                                    <ui:FANumberBox Margin="0,0,5,0" Value="{Binding MaxFps}" Minimum="0" Maximum="999" Width="80" />
                                     <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">fps</TextBlock>
                                   </StackPanel>
                                   <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0">Range of video fps (frames per second) to activate this chain. Higher fps videos require more processing power to upscale. A maximum fps of 0 means the chain will run on all video fps.</TextBlock>
@@ -568,7 +568,7 @@
                                               <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10">
                                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">Resize Height Before Upscale</TextBlock>
-                                                  <ui:NumberBox Margin="0,0,5,0" Maximum="1080" Minimum="0" Value="{Binding ResizeHeightBeforeUpscale}" />
+                                                  <ui:FANumberBox Margin="0,0,5,0" Maximum="1080" Minimum="0" Value="{Binding ResizeHeightBeforeUpscale}" />
                                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">px</TextBlock>
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0">Resize the video to this height before running this model, set to 0 to disable. Downscaling the video improves performance; for most sources downscaling reduces quality but some blurry sources may see improved sharpness with the right amount of downscaling.</TextBlock>
@@ -576,7 +576,7 @@
                                               <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10">
                                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">Resize Factor Before Upscale</TextBlock>
-                                                  <ui:NumberBox Margin="0,0,5,0" Maximum="100" Minimum="0" Value="{Binding ResizeFactorBeforeUpscale}" IsEnabled="{Binding ResizeFactorBeforeUpscaleIsEnabled}" />
+                                                  <ui:FANumberBox Margin="0,0,5,0" Maximum="100" Minimum="0" Value="{Binding ResizeFactorBeforeUpscale}" IsEnabled="{Binding ResizeFactorBeforeUpscaleIsEnabled}" />
                                                   <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">%</TextBlock>
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0">
