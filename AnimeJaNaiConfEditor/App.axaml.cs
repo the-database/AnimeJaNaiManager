@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using ReactiveUI.Avalonia;
 using ReactiveUI;
 using System;
@@ -21,6 +22,13 @@ namespace AnimeJaNaiConfEditor
 
         public override void OnFrameworkInitializationCompleted()
         {
+            // Dialog handlers are `async void`, so an exception thrown from one (e.g. a
+            // FluentAvalonia dialog bug) is posted to the UI dispatcher and would otherwise
+            // crash the whole app. Swallow it here so a single dialog failure degrades to a
+            // no-op instead of taking down the Manager.
+            Dispatcher.UIThread.UnhandledException += (_, e) => e.Handled = true;
+            TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();
+
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.MainWindow = new MainWindow

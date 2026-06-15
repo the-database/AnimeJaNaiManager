@@ -109,7 +109,7 @@ namespace AnimeJaNaiConfEditor.Views
                             }
                         };
 
-                        td.XamlRoot = VisualRoot as Visual;
+                        td.XamlRoot = this;
                         _ = await td.ShowAsync();
                     }
 
@@ -181,7 +181,7 @@ namespace AnimeJaNaiConfEditor.Views
                                 }
                             };
 
-                            td.XamlRoot = VisualRoot as Visual;
+                            td.XamlRoot = this;
                             _ = await td.ShowAsync();
                         }
                     }
@@ -240,7 +240,7 @@ namespace AnimeJaNaiConfEditor.Views
                             }
                         };
 
-                        td.XamlRoot = VisualRoot as Visual;
+                        td.XamlRoot = this;
                         _ = await td.ShowAsync();
                     }
                 }
@@ -343,7 +343,7 @@ namespace AnimeJaNaiConfEditor.Views
                     FATaskDialogButton.CancelButton,
                 },
             };
-            td.XamlRoot = VisualRoot as Visual;
+            td.XamlRoot = this;
             if (Equals(await td.ShowAsync(), runResult))
                 vm.LaunchBenchmark();
         }
@@ -471,7 +471,7 @@ namespace AnimeJaNaiConfEditor.Views
                 deferral.Complete();
             };
 
-            td.XamlRoot = VisualRoot as Visual;
+            td.XamlRoot = this;
             await td.ShowAsync();
 
             if (outcome is { } result)
@@ -511,7 +511,7 @@ namespace AnimeJaNaiConfEditor.Views
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 460 },
                 Buttons = { FATaskDialogButton.OKButton },
             };
-            td.XamlRoot = VisualRoot as Visual;
+            td.XamlRoot = this;
             await td.ShowAsync();
         }
     }
