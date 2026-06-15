@@ -25,7 +25,7 @@ using System.Threading.Tasks;
 
 namespace AnimeJaNaiConfEditor.Views
 {
-    public partial class MainWindow : AppWindow
+    public partial class MainWindow : FAAppWindow
     {
         public MainWindow()
         {
@@ -75,7 +75,7 @@ namespace AnimeJaNaiConfEditor.Views
 
                     if (inPath != null)
                     {
-                        var td = new TaskDialog
+                        var td = new FATaskDialog
                         {
                             Title = "Confirm Full Conf Import",
                             ShowProgressBar = false,
@@ -83,19 +83,18 @@ namespace AnimeJaNaiConfEditor.Views
     inPath,
                             Buttons =
             {
-                TaskDialogButton.OKButton,
-                TaskDialogButton.CancelButton
+                FATaskDialogButton.OKButton,
+                FATaskDialogButton.CancelButton
             }
                         };
 
 
                         td.Closing += async (s, e) =>
                         {
-                            if ((TaskDialogStandardResult)e.Result == TaskDialogStandardResult.OK)
+                            if ((FATaskDialogStandardResult)e.Result == FATaskDialogStandardResult.OK)
                             {
                                 var deferral = e.GetDeferral();
 
-                                td.SetProgressBarState(0, TaskDialogProgressState.Indeterminate);
                                 td.ShowProgressBar = true;
                                 int value = 0;
 
@@ -150,7 +149,7 @@ namespace AnimeJaNaiConfEditor.Views
                         }
                         else
                         {
-                            var td = new TaskDialog
+                            var td = new FATaskDialog
                             {
                                 Title = "Confirm Profile Conf Import",
                                 ShowProgressBar = false,
@@ -158,19 +157,18 @@ namespace AnimeJaNaiConfEditor.Views
                                 inPath,
                                 Buttons =
                             {
-                                TaskDialogButton.OKButton,
-                                TaskDialogButton.CancelButton
+                                FATaskDialogButton.OKButton,
+                                FATaskDialogButton.CancelButton
                             }
                             };
 
 
                             td.Closing += async (s, e) =>
                             {
-                                if ((TaskDialogStandardResult)e.Result == TaskDialogStandardResult.OK)
+                                if ((FATaskDialogStandardResult)e.Result == FATaskDialogStandardResult.OK)
                                 {
                                     var deferral = e.GetDeferral();
 
-                                    td.SetProgressBarState(0, TaskDialogProgressState.Indeterminate);
                                     td.ShowProgressBar = true;
 
                                     await Task.Run(() =>
@@ -207,26 +205,25 @@ namespace AnimeJaNaiConfEditor.Views
                     }
                     else
                     {
-                        var td = new TaskDialog
+                        var td = new FATaskDialog
                         {
                             Title = "Confirm Profile Conf Import",
                             ShowProgressBar = false,
                             Content = $"The profile {vm.SelectedProfileToClone.ProfileName} will be cloned to the current profile {vm.CurrentSlot.ProfileName}. All configuration settings will be backed up and then all configuration settings for the current profile {vm.CurrentSlot.ProfileName} will be overwritten.",
                             Buttons =
                         {
-                            TaskDialogButton.OKButton,
-                            TaskDialogButton.CancelButton
+                            FATaskDialogButton.OKButton,
+                            FATaskDialogButton.CancelButton
                         }
                         };
 
 
                         td.Closing += async (s, e) =>
                         {
-                            if ((TaskDialogStandardResult)e.Result == TaskDialogStandardResult.OK)
+                            if ((FATaskDialogStandardResult)e.Result == FATaskDialogStandardResult.OK)
                             {
                                 var deferral = e.GetDeferral();
 
-                                td.SetProgressBarState(0, TaskDialogProgressState.Indeterminate);
                                 td.ShowProgressBar = true;
                                 int value = 0;
 
@@ -325,7 +322,7 @@ namespace AnimeJaNaiConfEditor.Views
             if (DataContext is not MainWindowViewModel vm) return;
 
             const string runResult = "run";
-            var td = new TaskDialog
+            var td = new FATaskDialog
             {
                 Title = "Run playback benchmark",
                 Content = new TextBlock
@@ -342,8 +339,8 @@ namespace AnimeJaNaiConfEditor.Views
                 },
                 Buttons =
                 {
-                    new TaskDialogButton("Start benchmark", runResult),
-                    TaskDialogButton.CancelButton,
+                    new FATaskDialogButton("Start benchmark", runResult),
+                    FATaskDialogButton.CancelButton,
                 },
             };
             td.XamlRoot = VisualRoot as Visual;
@@ -452,15 +449,15 @@ namespace AnimeJaNaiConfEditor.Views
             panel.Children.Add(note);
 
             const string submitResult = "submit";
-            var td = new TaskDialog
+            var td = new FATaskDialog
             {
                 Title = "Submit benchmark to community catalog",
                 Content = panel,
                 ShowProgressBar = false,
                 Buttons =
                 {
-                    new TaskDialogButton("Submit", submitResult),
-                    TaskDialogButton.CancelButton,
+                    new FATaskDialogButton("Submit", submitResult),
+                    FATaskDialogButton.CancelButton,
                 },
             };
 
@@ -470,7 +467,6 @@ namespace AnimeJaNaiConfEditor.Views
                 if (!Equals(ev.Result, submitResult)) return;
                 var deferral = ev.GetDeferral();
                 td.ShowProgressBar = true;
-                td.SetProgressBarState(0, TaskDialogProgressState.Indeterminate);
                 outcome = await sub.SubmitAsync();   // sub's name/note are kept current by SubmitDialogModel
                 deferral.Complete();
             };
@@ -509,11 +505,11 @@ namespace AnimeJaNaiConfEditor.Views
 
         private async Task ShowInfoDialog(string title, string message)
         {
-            var td = new TaskDialog
+            var td = new FATaskDialog
             {
                 Title = title,
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 460 },
-                Buttons = { TaskDialogButton.OKButton },
+                Buttons = { FATaskDialogButton.OKButton },
             };
             td.XamlRoot = VisualRoot as Visual;
             await td.ShowAsync();
