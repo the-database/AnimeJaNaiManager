@@ -265,7 +265,7 @@
                     <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0">Higher levels (0-5) take longer to build the engine but can produce a faster engine. Default is 5.</TextBlock>
                   </Grid>
 
-                  <TextBox Text="{Binding AnimeJaNaiConf.TrtEngineSettings}" MaxWidth="800" HorizontalAlignment="Stretch" />
+                  <TextBox Text="{Binding AnimeJaNaiConf.TrtEngineSettings}" HorizontalAlignment="Stretch" TextWrapping="Wrap" AcceptsReturn="False" MinHeight="70" VerticalContentAlignment="Top" />
                 </StackPanel>
               </Border>
             </StackPanel>

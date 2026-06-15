@@ -695,11 +695,17 @@ chain_2_rife=no";
         // Keep CONFIG_VERSION, the current default, and the historical-defaults set in sync with
         // aji_conf.cpp in the animejanai-inference repo (the native filter's conf loader).
         private const int CONFIG_VERSION = 3;
+        // TRT 11: strongly-typed is the default (--stronglyTyped is a no-op), and the native filter's
+        // sanitizer strips --inputIOFormats/--outputIOFormats/--tacticSources anyway (types come from
+        // the network; the cuDNN/cuBLAS tactic sources are gone). Only the builder optimization level,
+        // build shape, and skip-inference are worth carrying.
         private const string DEFAULT_TRT_ENGINE_SETTINGS =
-            "--stronglyTyped --optShapes=input:%video_resolution% --inputIOFormats=fp16:chw --outputIOFormats=fp16:chw --builderOptimizationLevel=5 --tacticSources=-CUDNN,-CUBLAS,-CUBLAS_LT --skipInference";
+            "--builderOptimizationLevel=5 --optShapes=input:%video_resolution% --skipInference";
         private static readonly HashSet<string> LEGACY_DEFAULT_TRT_ENGINE_SETTINGS = new()
         {
             DEFAULT_TRT_ENGINE_SETTINGS,
+            // pre-trim default (TRT 8/10-era flags); drop it from old confs so the current default applies
+            "--stronglyTyped --optShapes=input:%video_resolution% --inputIOFormats=fp16:chw --outputIOFormats=fp16:chw --builderOptimizationLevel=5 --tacticSources=-CUDNN,-CUBLAS,-CUBLAS_LT --skipInference",
         };
 
         // Hand-edited confs can leave numeric keys empty; the native filter reads
@@ -1355,7 +1361,7 @@ chain_2_rife=no";
             set => this.RaiseAndSetIfChanged(ref _performanceSharp, value);
         }
 
-        private string _trtEngineSettings = "--stronglyTyped --optShapes=input:%video_resolution% --inputIOFormats=fp16:chw --outputIOFormats=fp16:chw --builderOptimizationLevel=5 --tacticSources=-CUDNN,-CUBLAS,-CUBLAS_LT --skipInference";
+        private string _trtEngineSettings = "--builderOptimizationLevel=5 --optShapes=input:%video_resolution% --skipInference";
         [DataMember]
         public string TrtEngineSettings
         {
