@@ -335,7 +335,7 @@ namespace AnimeJaNaiConfEditor.Views
                         "mpv windows will open and close on their own while it runs. Do not close " +
                         "or click them, or the results will be invalid.\n\n" +
                         "The first run builds a TensorRT engine per resolution (about a minute " +
-                        "each, cached afterward), so the whole benchmark takes several minutes, longer on slower GPUs.",
+                        "each, cached afterward), so the whole benchmark can take 10+ minutes depending on your hardware.",
                 },
                 Buttons =
                 {

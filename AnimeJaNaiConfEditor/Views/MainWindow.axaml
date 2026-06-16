@@ -183,7 +183,7 @@
               Run Benchmarks
             </TextBlock>
           </StackPanel>
-          <TextBlock Width="280" TextWrapping="WrapWithOverflow" Margin="0,5,10,0" FontSize="10" Opacity=".5">Measure your real playback fps (the speed you will actually get) at several resolutions. mpv windows will open and close on their own during the test; leave them alone or the results will be invalid. Can take several minutes, longer on slower GPUs.</TextBlock>
+          <TextBlock Width="280" TextWrapping="WrapWithOverflow" Margin="0,5,10,0" FontSize="10" Opacity=".5">Measure your real playback fps (the speed you will actually get) at several resolutions. mpv windows will open and close on their own during the test; leave them alone or the results will be invalid. Can take 10+ minutes depending on your hardware.</TextBlock>
         </StackPanel>
       </Button>
       <Button HorizontalAlignment="Stretch" FontSize="13" Padding="10" Click="SubmitBenchmarkButtonClick" HorizontalContentAlignment="Left">
