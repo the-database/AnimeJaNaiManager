@@ -767,7 +767,12 @@ chain_2_rife=no";
                 ? DEFAULT_TRT_ENGINE_SETTINGS
                 : trtEngineSettings;
 
-            bool IsSharp(string key) => parser.GetValue("global", key, "standard").Trim()
+            // v2 (animejanai 3.3.0) had a single global default_preset for all default profiles; v3
+            // split it into per-profile quality/balanced/performance keys. Use default_preset as the
+            // fallback so a migrated conf keeps its Sharp selection. The per-profile keys (when
+            // present in a v3 conf) take precedence; default_preset is absent in v3 confs.
+            var legacyPreset = parser.GetValue("global", "default_preset", "standard");
+            bool IsSharp(string key) => parser.GetValue("global", key, legacyPreset).Trim()
                 .Equals("sharp", StringComparison.OrdinalIgnoreCase);
             animeJaNaiConf.QualitySharp = IsSharp("quality_preset");
             animeJaNaiConf.BalancedSharp = IsSharp("balanced_preset");

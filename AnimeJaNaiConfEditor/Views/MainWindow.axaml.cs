@@ -102,7 +102,11 @@ namespace AnimeJaNaiConfEditor.Views
                                 await Task.Run(() =>
                                 {
                                     vm.CheckAndDoBackup();
-                                    vm.AnimeJaNaiConf = vm.ReadAnimeJaNaiConf(inPath);
+                                    // autoSave: true wires the imported slots/chains/models for
+                                    // persistence; the explicit write commits the import itself to
+                                    // animejanai.conf (assigning AnimeJaNaiConf does not trigger a save).
+                                    vm.AnimeJaNaiConf = vm.ReadAnimeJaNaiConf(inPath, true);
+                                    vm.WriteAnimeJaNaiConf();
                                 });
 
                                 deferral.Complete();
