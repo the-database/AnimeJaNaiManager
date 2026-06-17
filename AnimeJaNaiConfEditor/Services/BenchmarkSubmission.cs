@@ -33,14 +33,14 @@ namespace AnimeJaNaiConfEditor.Services
         [JsonPropertyName("app_version")] public string AppVersion { get; set; } = "";
         [JsonPropertyName("backend")] public string Backend { get; set; } = "";
         [JsonPropertyName("gpu")] public string Gpu { get; set; } = "";
-        // Accurate total VRAM from nvidia-smi for NVIDIA; omitted otherwise
-        // (WMI AdapterRAM is a uint32 that caps at ~4 GB, so it would lie about
-        // modern cards - better to leave it blank than report a wrong number).
+        // Accurate total VRAM from DXGI for all vendors; NVIDIA systems also
+        // get the same value from nvidia-smi as a fallback/confirmation.
         [JsonPropertyName("vram_mb")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public long? VramMb { get; set; }
-        // Enforced GPU power limit / TGP in watts (NVIDIA only; the biggest
-        // reason results diverge across the "same" GPU - laptop vs desktop).
+        // Enforced GPU power limit / TGP in watts. NVIDIA reports the live
+        // power limit through nvidia-smi; AMD falls back to nominal board power
+        // for known desktop GPU names when no vendor API is available.
         [JsonPropertyName("gpu_power_w")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int GpuPowerW { get; set; }
@@ -115,7 +115,7 @@ namespace AnimeJaNaiConfEditor.Services
                 var row = new Dictionary<string, double>();
                 for (int i = 1; i < cells.Length && i - 1 < cols.Length; i++)
                 {
-                    if (double.TryParse(cells[i], NumberStyles.Float, CultureInfo.InvariantCulture, out var fps))
+                    if (TryParseFpsCell(cells[i], out var fps))
                         row[cols[i - 1]] = fps;
                 }
                 if (row.Count > 0) sub.Results[cells[0]] = row;
@@ -132,14 +132,17 @@ namespace AnimeJaNaiConfEditor.Services
             AppVersion = ReadAppVersion(animejanaiDir);
             Os = RuntimeInformation.OSDescription;
             try { GatherFromWmi(); } catch { /* WMI unavailable: leave blank */ }
+            TryFillDxgiMemory();
             TryFillNvidia();
+            TryFillKnownGpuSpecs();
         }
 
-        // Total VRAM (MB) and enforced power limit / TGP (W) from nvidia-smi
-        // (NVML under the hood). No-op on non-NVIDIA systems or if nvidia-smi
-        // isn't on PATH. With multiple NVIDIA GPUs, the largest-memory one (the
-        // card actually doing the upscaling) wins, and its power is taken from
-        // the same row.
+        // GPU name, total VRAM (MB), enforced power limit / TGP (W), and driver
+        // from nvidia-smi (NVML under the hood). No-op on non-NVIDIA systems or
+        // if nvidia-smi isn't on PATH. With multiple NVIDIA GPUs, the
+        // largest-memory one wins, and all NVIDIA fields are taken from that row.
+        // For TensorRT this is the authoritative GPU identity; WMI often lists an
+        // AMD/Intel iGPU first on Ryzen/Intel hybrid systems.
         void TryFillNvidia()
         {
             try
@@ -147,7 +150,7 @@ namespace AnimeJaNaiConfEditor.Services
                 using var p = Process.Start(new ProcessStartInfo
                 {
                     FileName = "nvidia-smi",
-                    Arguments = "--query-gpu=memory.total,power.limit --format=csv,noheader,nounits",
+                    Arguments = "--query-gpu=name,memory.total,power.limit,driver_version --format=csv,noheader,nounits",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -156,21 +159,64 @@ namespace AnimeJaNaiConfEditor.Services
                 if (p == null) return;
                 var stdout = p.StandardOutput.ReadToEnd();
                 p.WaitForExit(4000);
+                string bestName = "";
+                string bestDriver = "";
                 long bestVram = 0;
                 int bestPower = 0;
                 foreach (var line in stdout.Split('\n'))
                 {
                     var parts = line.Split(',');
-                    if (!long.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var vram))
+                    if (parts.Length < 2)
+                        continue;
+                    if (!long.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var vram))
                         continue;
                     if (vram <= bestVram) continue;
+                    bestName = parts[0].Trim();
                     bestVram = vram;
-                    bestPower = parts.Length >= 2 &&
-                                double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var w)
+                    bestPower = parts.Length >= 3 &&
+                                double.TryParse(parts[2].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var w)
                         ? (int)Math.Round(w) : 0;
+                    bestDriver = parts.Length >= 4 ? parts[3].Trim() : "";
                 }
+                var hadNoGpu = Gpu.Length == 0;
+                var hadIntegratedGpu = IsIntegratedGpuName(Gpu);
+                var hadNonNvidiaGpu = Gpu.Length > 0 && !IsNvidiaGpuName(Gpu);
+                var shouldReplaceWithNvidia = Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase) ||
+                                              hadNoGpu ||
+                                              hadIntegratedGpu;
+                if (bestName.Length > 0 && shouldReplaceWithNvidia)
+                    Gpu = bestName;
                 if (bestVram > 0) VramMb = bestVram;
                 if (bestPower > 0) GpuPowerW = bestPower;
+                if (bestDriver.Length > 0 && (Driver.Length == 0 || hadNoGpu || hadNonNvidiaGpu))
+                    Driver = bestDriver;
+            }
+            catch { /* leave blank */ }
+        }
+
+        void TryFillDxgiMemory()
+        {
+            try
+            {
+                var adapters = DxgiAdapterInfo.Enumerate();
+                if (adapters.Count == 0) return;
+
+                var tensorRt = Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase);
+                var selected = adapters
+                    .Where(a => a.DedicatedVideoMemory > 0 && !a.Software)
+                    .OrderByDescending(a => DxgiAdapterScore(a, tensorRt))
+                    .ThenByDescending(a => a.DedicatedVideoMemory)
+                    .FirstOrDefault();
+
+                if (selected.Name.Length == 0 || selected.DedicatedVideoMemory <= 0)
+                    return;
+
+                if (Gpu.Length == 0 ||
+                    IsIntegratedGpuName(Gpu) ||
+                    (tensorRt && IsNvidiaGpuName(selected.Name)))
+                    Gpu = selected.Name;
+
+                VramMb = (long)Math.Round(selected.DedicatedVideoMemory / 1048576.0);
             }
             catch { /* leave blank */ }
         }
@@ -186,10 +232,13 @@ namespace AnimeJaNaiConfEditor.Services
                                 && !g.name.Contains("Basic Render", StringComparison.OrdinalIgnoreCase)
                                 && !g.name.Contains("Remote Display", StringComparison.OrdinalIgnoreCase))
                     .ToList();
-                // Prefer a discrete GPU (the one doing the upscaling) over an
-                // integrated adapter when both are present.
-                var pick = gpus.FirstOrDefault(g => Regex.IsMatch(g.name,
-                    @"NVIDIA|GeForce|RTX|GTX|Radeon|\bAMD\b|Arc\b", RegexOptions.IgnoreCase));
+                // Prefer the adapter that can actually run the selected backend.
+                // WMI order is not stable: Ryzen systems often list
+                // "AMD Radeon(TM) Graphics" before the NVIDIA dGPU.
+                var tensorRt = Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase);
+                var pick = tensorRt
+                    ? gpus.FirstOrDefault(g => IsNvidiaGpuName(g.name))
+                    : gpus.OrderByDescending(g => GpuPriority(g.name)).FirstOrDefault();
                 if (pick.name == null || pick.name.Length == 0) pick = gpus.FirstOrDefault();
                 if (pick.name != null && pick.name.Length > 0) { Gpu = pick.name; Driver = pick.driver; }
             }
@@ -233,6 +282,209 @@ namespace AnimeJaNaiConfEditor.Services
         {
             try { return value == null ? 0L : Convert.ToInt64(value, CultureInfo.InvariantCulture); }
             catch { return 0L; }
+        }
+
+        static bool IsNvidiaGpuName(string name) =>
+            Regex.IsMatch(name, @"NVIDIA|GeForce|\bRTX\b|\bGTX\b|Quadro|Titan", RegexOptions.IgnoreCase);
+
+        static bool TryParseFpsCell(string cell, out double fps)
+        {
+            if (double.TryParse(cell, NumberStyles.Float, CultureInfo.InvariantCulture, out fps))
+                return true;
+            if (double.TryParse(cell, NumberStyles.Float, CultureInfo.CurrentCulture, out fps))
+                return true;
+
+            var normalized = cell.Trim().Replace(',', '.');
+            return normalized.Contains('.') &&
+                   double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out fps);
+        }
+
+        static bool IsIntegratedGpuName(string name) =>
+            Regex.IsMatch(name, @"Radeon\(TM\) Graphics|AMD Radeon Graphics|Intel\(R\).*Graphics|Intel.*UHD|Intel.*Iris", RegexOptions.IgnoreCase);
+
+        static int GpuPriority(string name)
+        {
+            if (IsNvidiaGpuName(name)) return 500;
+            if (Regex.IsMatch(name, @"Radeon\s+(RX|Pro|VII)|\bRX\s*\d|Arc\b", RegexOptions.IgnoreCase)) return 400;
+            if (Regex.IsMatch(name, @"Radeon|\bAMD\b", RegexOptions.IgnoreCase) && !IsIntegratedGpuName(name)) return 300;
+            if (Regex.IsMatch(name, @"Iris|UHD|Intel", RegexOptions.IgnoreCase)) return 100;
+            return 0;
+        }
+
+        int DxgiAdapterScore(DxgiAdapterInfo adapter, bool tensorRt)
+        {
+            int score = GpuPriority(adapter.Name);
+            if (tensorRt && IsNvidiaGpuName(adapter.Name)) score += 1000;
+            if (GpuNameMatches(Gpu, adapter.Name)) score += 600;
+            return score;
+        }
+
+        static bool GpuNameMatches(string a, string b)
+        {
+            a = NormalizeGpuName(a);
+            b = NormalizeGpuName(b);
+            return a.Length > 0 && b.Length > 0 && (a.Contains(b) || b.Contains(a));
+        }
+
+        static string NormalizeGpuName(string s) =>
+            Regex.Replace(s ?? "", @"[^a-z0-9]+", "", RegexOptions.IgnoreCase).ToLowerInvariant();
+
+        void TryFillKnownGpuSpecs()
+        {
+            var spec = KnownGpuSpec(Gpu);
+            if (spec.vramMb > 0 && !VramMb.HasValue) VramMb = spec.vramMb;
+            if (spec.powerW > 0 && GpuPowerW == 0) GpuPowerW = spec.powerW;
+        }
+
+        static (long vramMb, int powerW) KnownGpuSpec(string name)
+        {
+            foreach (var spec in KnownGpuSpecs)
+                if (Regex.IsMatch(name ?? "", spec.pattern, RegexOptions.IgnoreCase))
+                    return (spec.vramMb, spec.powerW);
+            return (0, 0);
+        }
+
+        static readonly (string pattern, long vramMb, int powerW)[] KnownGpuSpecs =
+        {
+            (@"Radeon\s+RX\s+9070\s+XT\b", 16384, 304),
+            (@"Radeon\s+RX\s+9070\s+GRE\b", 12288, 220),
+            (@"Radeon\s+RX\s+9070\b", 16384, 220),
+            (@"Radeon\s+RX\s+9060\s+XT\b", 0, 160),
+            (@"Radeon\s+RX\s+7900\s+XTX\b", 24576, 355),
+            (@"Radeon\s+RX\s+7900\s+XT\b", 20480, 315),
+            (@"Radeon\s+RX\s+7900\s+GRE\b", 16384, 260),
+            (@"Radeon\s+RX\s+7800\s+XT\b", 16384, 263),
+            (@"Radeon\s+RX\s+7700\s+XT\b", 12288, 245),
+            (@"Radeon\s+RX\s+7600\s+XT\b", 16384, 165),
+            (@"Radeon\s+RX\s+7600\b", 8192, 165),
+            (@"Radeon\s+RX\s+6950\s+XT\b", 16384, 335),
+            (@"Radeon\s+RX\s+6900\s+XT\b", 16384, 300),
+            (@"Radeon\s+RX\s+6800\s+XT\b", 16384, 300),
+            (@"Radeon\s+RX\s+6800\b", 16384, 250),
+            (@"Radeon\s+RX\s+6750\s+XT\b", 12288, 250),
+            (@"Radeon\s+RX\s+6700\s+XT\b", 12288, 230),
+            (@"Radeon\s+RX\s+6600\s+XT\b", 8192, 160),
+            (@"Radeon\s+RX\s+6600\b", 8192, 132),
+        };
+
+        readonly struct DxgiAdapterInfo
+        {
+            const int DXGI_ERROR_NOT_FOUND = unchecked((int)0x887A0002);
+            readonly string _name;
+            readonly ulong _dedicatedVideoMemory;
+            readonly bool _software;
+
+            public string Name => _name ?? "";
+            public ulong DedicatedVideoMemory => _dedicatedVideoMemory;
+            public bool Software => _software;
+
+            DxgiAdapterInfo(string name, ulong dedicatedVideoMemory, bool software)
+            {
+                _name = name;
+                _dedicatedVideoMemory = dedicatedVideoMemory;
+                _software = software;
+            }
+
+            public static List<DxgiAdapterInfo> Enumerate()
+            {
+                var adapters = new List<DxgiAdapterInfo>();
+                var iid = new Guid("770aae78-f26f-4dba-a829-253c83d1b387");
+                if (CreateDXGIFactory1(ref iid, out var factory) < 0 || factory == null)
+                    return adapters;
+
+                try
+                {
+                    for (uint i = 0; ; i++)
+                    {
+                        IDXGIAdapter1 adapter;
+                        int hr;
+                        try { hr = factory.EnumAdapters1(i, out adapter); }
+                        catch (COMException ex) when (ex.ErrorCode == DXGI_ERROR_NOT_FOUND) { break; }
+
+                        if (hr == DXGI_ERROR_NOT_FOUND) break;
+                        if (hr < 0 || adapter == null) break;
+
+                        try
+                        {
+                            if (adapter.GetDesc1(out var desc) >= 0)
+                            {
+                                adapters.Add(new DxgiAdapterInfo(
+                                    desc.Description?.Trim() ?? "",
+                                    desc.DedicatedVideoMemory.ToUInt64(),
+                                    (desc.Flags & 2) != 0));
+                            }
+                        }
+                        finally
+                        {
+                            Marshal.ReleaseComObject(adapter);
+                        }
+                    }
+                }
+                finally
+                {
+                    Marshal.ReleaseComObject(factory);
+                }
+
+                return adapters;
+            }
+
+            [DllImport("dxgi.dll", SetLastError = false)]
+            static extern int CreateDXGIFactory1(ref Guid riid, out IDXGIFactory1 factory);
+
+            [ComImport, Guid("770aae78-f26f-4dba-a829-253c83d1b387"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IDXGIFactory1
+            {
+                [PreserveSig] int SetPrivateData(ref Guid name, uint dataSize, IntPtr data);
+                [PreserveSig] int SetPrivateDataInterface(ref Guid name, IntPtr unknown);
+                [PreserveSig] int GetPrivateData(ref Guid name, ref uint dataSize, IntPtr data);
+                [PreserveSig] int GetParent(ref Guid riid, out IntPtr parent);
+                [PreserveSig] int EnumAdapters(uint adapter, out IntPtr dxgiAdapter);
+                [PreserveSig] int MakeWindowAssociation(IntPtr windowHandle, uint flags);
+                [PreserveSig] int GetWindowAssociation(out IntPtr windowHandle);
+                [PreserveSig] int CreateSwapChain(IntPtr device, IntPtr desc, out IntPtr swapChain);
+                [PreserveSig] int CreateSoftwareAdapter(IntPtr module, out IntPtr adapter);
+                [PreserveSig] int EnumAdapters1(uint adapter, out IDXGIAdapter1 dxgiAdapter);
+                [PreserveSig] bool IsCurrent();
+            }
+
+            [ComImport, Guid("29038f61-3839-4626-91fd-086879011a05"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IDXGIAdapter1
+            {
+                [PreserveSig] int SetPrivateData(ref Guid name, uint dataSize, IntPtr data);
+                [PreserveSig] int SetPrivateDataInterface(ref Guid name, IntPtr unknown);
+                [PreserveSig] int GetPrivateData(ref Guid name, ref uint dataSize, IntPtr data);
+                [PreserveSig] int GetParent(ref Guid riid, out IntPtr parent);
+                [PreserveSig] int EnumOutputs(uint output, out IntPtr dxgiOutput);
+                [PreserveSig] int GetDesc(out DXGI_ADAPTER_DESC desc);
+                [PreserveSig] int CheckInterfaceSupport(ref Guid interfaceName, out long umdVersion);
+                [PreserveSig] int GetDesc1(out DXGI_ADAPTER_DESC1 desc);
+            }
+
+            [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+            struct DXGI_ADAPTER_DESC
+            {
+                [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Description;
+                public uint VendorId, DeviceId, SubSysId, Revision;
+                public UIntPtr DedicatedVideoMemory, DedicatedSystemMemory, SharedSystemMemory;
+                public LUID AdapterLuid;
+            }
+
+            [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+            struct DXGI_ADAPTER_DESC1
+            {
+                [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Description;
+                public uint VendorId, DeviceId, SubSysId, Revision;
+                public UIntPtr DedicatedVideoMemory, DedicatedSystemMemory, SharedSystemMemory;
+                public LUID AdapterLuid;
+                public uint Flags;
+            }
+
+            [StructLayout(LayoutKind.Sequential)]
+            struct LUID
+            {
+                public uint LowPart;
+                public int HighPart;
+            }
         }
 
         static string ReadAppVersion(string animejanaiDir)
