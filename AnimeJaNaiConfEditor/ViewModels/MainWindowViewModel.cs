@@ -285,7 +285,7 @@ chain_2_min_fps=0
 chain_2_max_fps=31
 chain_2_model_1_resize_height_before_upscale=0
 chain_2_model_1_resize_factor_before_upscale=100
-chain_2_model_1_name=2x_AnimeJaNai_SD_V1beta34_Compact_1x3xHxW_dyn-HW_strong_fp16_op23_dynamo
+chain_2_model_1_name=2x_AnimeJaNai_SD_V1beta34_Compact_1x3xHxW_dyn-HW_strong_fp16_op21_dynamo
 chain_2_rife=no
 chain_3_min_resolution=0x0
 chain_3_max_resolution=1920x1080
@@ -311,7 +311,7 @@ chain_2_min_fps=0
 chain_2_max_fps=31
 chain_2_model_1_resize_height_before_upscale=0
 chain_2_model_1_resize_factor_before_upscale=100
-chain_2_model_1_name=2x_AnimeJaNai_SD_V1beta34_Compact_1x3xHxW_dyn-HW_strong_fp16_op23_dynamo
+chain_2_model_1_name=2x_AnimeJaNai_SD_V1beta34_Compact_1x3xHxW_dyn-HW_strong_fp16_op21_dynamo
 chain_2_rife=no
 [slot_3]
 profile_name=Performance
@@ -329,7 +329,7 @@ chain_2_min_fps=0
 chain_2_max_fps=31
 chain_2_model_1_resize_height_before_upscale=0
 chain_2_model_1_resize_factor_before_upscale=100
-chain_2_model_1_name=2x_AnimeJaNai_SD_V1beta34_Compact_1x3xHxW_dyn-HW_strong_fp16_op23_dynamo
+chain_2_model_1_name=2x_AnimeJaNai_SD_V1beta34_Compact_1x3xHxW_dyn-HW_strong_fp16_op21_dynamo
 chain_2_rife=no";
 
         public string ExePath = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
