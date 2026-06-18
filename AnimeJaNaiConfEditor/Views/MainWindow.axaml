@@ -664,7 +664,7 @@
 
                                 <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10" IsVisible="{Binding EnableRife}">
                                   <CheckBox Grid.Column="0" IsChecked="{Binding RifeBeforeUpscale}" Content="Interpolate before upscaling" />
-                                  <TextBlock Grid.Column="1" Classes="help" Foreground="Gray" Margin="20,0,0,0" Text="Run RIFE at the source resolution before upscaling (faster, recommended). Uncheck to interpolate the upscaled frames instead (the old order, slower; only the TensorRT and DirectML backends honor this)." />
+                                  <TextBlock Grid.Column="1" Classes="help" Foreground="Gray" Margin="20,0,0,0" Text="Run RIFE at the source resolution before upscaling (faster, recommended). Uncheck to interpolate the upscaled frames instead." />
                                 </Grid>
 
                               </StackPanel>
