@@ -1157,8 +1157,17 @@ chain_2_rife=no";
             {
                 using var process = new Process();
 
-                process.StartInfo.FileName = "cmd.exe";
-                process.StartInfo.Arguments = @"/C .\benchmarks\animejanai_benchmark_all.bat";
+                if (OperatingSystem.IsWindows())
+                {
+                    process.StartInfo.FileName = "cmd.exe";
+                    process.StartInfo.Arguments = @"/C .\benchmarks\animejanai_benchmark_all.bat";
+                }
+                else
+                {
+                    // Linux: the same benchmark run via the cross-platform .NET tool.
+                    process.StartInfo.FileName = "/bin/sh";
+                    process.StartInfo.Arguments = "./benchmarks/animejanai_benchmark_all.sh";
+                }
 
                 process.StartInfo.RedirectStandardOutput = false;
                 process.StartInfo.RedirectStandardError = false;
