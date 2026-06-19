@@ -342,14 +342,19 @@ chain_2_rife=no";
             !File.Exists(Path.Combine(AppContext.BaseDirectory, "animejanai.conf")) &&
             File.Exists(Path.Combine(AppContext.BaseDirectory, "animejanai", "animejanai.conf"));
 
-        // animejanai/: conf, onnx models, rife models, benchmarks, backups
-        public static string DataDir { get; } = Path.GetFullPath(AtInstallRoot
-            ? Path.Combine(AppContext.BaseDirectory, "animejanai")
+        // animejanai/: conf, onnx models, rife models, benchmarks, backups.
+        // ANIMEJANAI_DATA_DIR / ANIMEJANAI_ROOT override the exe-relative layout
+        // for the AppImage, where the binary is in a read-only mount but the
+        // writable data lives under $XDG_DATA_HOME/AnimeJaNai.
+        public static string DataDir { get; } = Path.GetFullPath(
+            Environment.GetEnvironmentVariable("ANIMEJANAI_DATA_DIR") is { Length: > 0 } dd ? dd
+            : AtInstallRoot ? Path.Combine(AppContext.BaseDirectory, "animejanai")
             : AppContext.BaseDirectory);
 
-        // install root: mpvnet.exe, AnimeJaNaiUpdater.exe, portable_config/
-        public static string RootDir { get; } = Path.GetFullPath(AtInstallRoot
-            ? AppContext.BaseDirectory
+        // install root: player, AnimeJaNaiUpdater, portable_config/
+        public static string RootDir { get; } = Path.GetFullPath(
+            Environment.GetEnvironmentVariable("ANIMEJANAI_ROOT") is { Length: > 0 } rd ? rd
+            : AtInstallRoot ? AppContext.BaseDirectory
             : Path.Combine(AppContext.BaseDirectory, ".."));
 
         public string BackupPath => Path.Combine(DataDir, "backups");
@@ -1157,8 +1162,17 @@ chain_2_rife=no";
             {
                 using var process = new Process();
 
-                process.StartInfo.FileName = "cmd.exe";
-                process.StartInfo.Arguments = @"/C .\benchmarks\animejanai_benchmark_all.bat";
+                if (OperatingSystem.IsWindows())
+                {
+                    process.StartInfo.FileName = "cmd.exe";
+                    process.StartInfo.Arguments = @"/C .\benchmarks\animejanai_benchmark_all.bat";
+                }
+                else
+                {
+                    // Linux: the same benchmark run via the cross-platform .NET tool.
+                    process.StartInfo.FileName = "/bin/sh";
+                    process.StartInfo.Arguments = "./benchmarks/animejanai_benchmark_all.sh";
+                }
 
                 process.StartInfo.RedirectStandardOutput = false;
                 process.StartInfo.RedirectStandardError = false;

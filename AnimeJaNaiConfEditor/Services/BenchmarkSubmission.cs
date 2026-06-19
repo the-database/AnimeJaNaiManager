@@ -131,7 +131,14 @@ namespace AnimeJaNaiConfEditor.Services
         {
             AppVersion = ReadAppVersion(animejanaiDir);
             Os = RuntimeInformation.OSDescription;
-            try { GatherFromWmi(); } catch { /* WMI unavailable: leave blank */ }
+            if (OperatingSystem.IsWindows())
+            {
+                try { GatherFromWmi(); } catch { /* WMI unavailable: leave blank */ }
+            }
+            else
+            {
+                try { GatherFromProc(); } catch { /* /proc unavailable: leave blank */ }
+            }
             TryFillDxgiMemory();
             TryFillNvidia();
             TryFillKnownGpuSpecs();
@@ -276,6 +283,29 @@ namespace AnimeJaNaiConfEditor.Services
                 }
                 if (best > 0) RamSpeedMhz = best;
             }
+        }
+
+        // Linux equivalent of GatherFromWmi for CPU/RAM (the GPU comes from
+        // nvidia-smi via TryFillNvidia, same as Windows). RAM speed needs
+        // dmidecode/root, so it's left blank.
+        void GatherFromProc()
+        {
+            var cpuinfo = File.ReadAllText("/proc/cpuinfo");
+            var model = Regex.Match(cpuinfo, @"model name\s*:\s*(.+)");
+            if (model.Success) Cpu = model.Groups[1].Value.Trim();
+            CpuThreads = Regex.Matches(cpuinfo, @"(?m)^processor\s*:").Count;
+            var cores = Regex.Match(cpuinfo, @"cpu cores\s*:\s*(\d+)");
+            CpuCores = cores.Success ? int.Parse(cores.Groups[1].Value, CultureInfo.InvariantCulture)
+                                     : CpuThreads;
+            var mhz = Regex.Match(cpuinfo, @"cpu MHz\s*:\s*([\d.]+)");
+            if (mhz.Success &&
+                double.TryParse(mhz.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var m))
+                CpuMhz = (int)Math.Round(m);
+
+            var memTotal = Regex.Match(File.ReadAllText("/proc/meminfo"), @"MemTotal:\s*(\d+)\s*kB");
+            if (memTotal.Success &&
+                long.TryParse(memTotal.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var kb))
+                RamMb = (long)Math.Round(kb / 1024.0);
         }
 
         static long ToLong(object? value)
