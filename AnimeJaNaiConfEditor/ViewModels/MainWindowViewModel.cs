@@ -734,6 +734,7 @@ chain_2_rife=no";
             var slots = new Dictionary<string, UpscaleSlot>();
 
             animeJaNaiConf.EnableLogging = ParseBool(parser.GetValue("global", "logging", "no"));
+            animeJaNaiConf.AutoDisplayRefresh = ParseBool(parser.GetValue("global", "display_rate_match", "no"));
             animeJaNaiConf.BackendAutoFallback = ParseBool(parser.GetValue("global", "backend_auto_fallback", "no"));
             if (Enum.TryParse(parser.GetValue("global", "backend", "TensorRT"), out Backend backend))
             {
@@ -1042,6 +1043,10 @@ chain_2_rife=no";
             {
                 parser.SetValue("global", "sub_render_mode", SUB_RENDER_MODE_GPU);
             }
+            if (conf.AutoDisplayRefresh)
+            {
+                parser.SetValue("global", "display_rate_match", "yes");
+            }
             // Write-minimal: only persist trt_engine_settings when it differs from the current
             // default, so future default changes apply automatically to users who didn't customize.
             if (conf.TrtEngineSettings != DEFAULT_TRT_ENGINE_SETTINGS)
@@ -1319,7 +1324,8 @@ chain_2_rife=no";
                     x => x.QualitySharp,
                     x => x.BalancedSharp,
                     x => x.PerformanceSharp,
-                    x => x.GpuSubtitles).Subscribe(x =>
+                    x => x.GpuSubtitles,
+                    x => x.AutoDisplayRefresh).Subscribe(x =>
                     {
                         Vm?.WriteAnimeJaNaiConf();
                     });
@@ -1595,6 +1601,14 @@ chain_2_rife=no";
         }
 
         public Backend SelectedBackend => DirectMlSelected ? Backend.DirectML : Backend.TensorRT;
+
+        private bool _autoDisplayRefresh;
+        [DataMember]
+        public bool AutoDisplayRefresh
+        {
+            get => _autoDisplayRefresh;
+            set => this.RaiseAndSetIfChanged(ref _autoDisplayRefresh, value);
+        }
     }
 
     [DataContract]
