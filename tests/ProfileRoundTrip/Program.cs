@@ -12,6 +12,19 @@ try
         "[slot_1]\nprofile_name=Round trip\nchain_1_rife=yes\nchain_1_rife_ensemble=yes\n");
     var vm = new MainWindowViewModel();
     vm.SelectedSlotNumber = "1";
+    if (vm.AnimeJaNaiConf.AutoDisplayRefresh)
+        throw new Exception("Automatic display refresh must default to off");
+    foreach (bool enabled in new[] { true, false })
+    {
+        vm.AnimeJaNaiConf.AutoDisplayRefresh = enabled;
+        string full = Path.Combine(data, $"display-refresh-{enabled}.conf");
+        vm.WriteAnimeJaNaiConf(full);
+        if (vm.ReadAnimeJaNaiConf(full).AutoDisplayRefresh != enabled)
+            throw new Exception($"Full config lost automatic display refresh={enabled}");
+        if (vm.ReadAnimeJaNaiConf(Path.Combine(data, "animejanai.conf")).AutoDisplayRefresh != enabled)
+            throw new Exception($"Autosave lost automatic display refresh={enabled}");
+        Console.WriteLine($"PASS automatic display refresh={enabled} export/reload and autosave");
+    }
     foreach (bool ensemble in new[] { true, false })
     {
         vm.CurrentSlot.Chains[0].RifeEnsemble = ensemble;
