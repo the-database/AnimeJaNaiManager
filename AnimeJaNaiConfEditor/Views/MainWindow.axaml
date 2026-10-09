@@ -611,6 +611,13 @@
                                                 </Button>
                                                 <TextBlock Grid.Column="3" Classes="help" Margin="20,0,0,0">The upscaling model to run. To choose from more models, add ONNX model files to the models directory.</TextBlock>
                                               </Grid>
+                                              <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10" IsVisible="{Binding IsTemporal}">
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                  <TextBlock Margin="0,0,5,0" VerticalAlignment="Center">Scene Change Threshold</TextBlock>
+                                                  <ui:FANumberBox Margin="0,0,5,0" Maximum="1" Minimum="0" SmallChange="0.01" Value="{Binding TemporalSceneThreshold}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0" Text="{Binding TemporalFrames, StringFormat='This is a temporal model: it upscales each frame from a {0}-frame window around it. Neighbors across a scene change (an average frame difference above this threshold) are replaced by the nearest frame from the same scene. Set to 0 to disable scene detection. Temporal models require the TensorRT backend.'}" />
+                                              </Grid>
                                             </StackPanel>
 
                                             <Button Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top" Command="{Binding $parent[ItemsControl].((vm:UpscaleChain)DataContext).DeleteModel}" CommandParameter="{Binding}">
