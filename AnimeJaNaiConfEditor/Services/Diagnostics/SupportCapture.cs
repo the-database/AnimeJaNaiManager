@@ -128,6 +128,33 @@ public static class SupportCapture
         { /* Missing timeline is reported at the end, including an early startup hang. */ }
     }
 
+    public static async Task<double?> ReadPlaybackTimeAsync(SupportReport report)
+    {
+        // Ask the diagnostic player at the click, rather than using a periodic
+        // timeline sample which can still describe the position before a seek.
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            using var client = new NamedPipeClientStream(".", "AJN-diagnostics-" + report.Id,
+                PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(timeout.Token);
+            await client.WriteAsync("{\"command\":[\"get_property\",\"time-pos\"],\"request_id\":1}\n"u8.ToArray(), timeout.Token);
+            using var reader = new StreamReader(client);
+            while (await reader.ReadLineAsync(timeout.Token) is { } line)
+            {
+                using var response = JsonDocument.Parse(line);
+                var root = response.RootElement;
+                if (!root.TryGetProperty("request_id", out var id) || id.GetInt32() != 1) continue;
+                return root.TryGetProperty("error", out var error) && error.GetString() == "success" &&
+                    root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Number &&
+                    data.TryGetDouble(out double seconds) && double.IsFinite(seconds) && seconds >= 0 ? seconds : null;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException or TimeoutException or JsonException)
+        { /* Keep the marker even if startup hung or there is no loaded video. */ }
+        return null;
+    }
+
     // Even if libmpv hangs before scripts/IPC initialize, Windows can report
     // memory/CPU, window creation and injected graphics DLLs from this process.
     private static void Snapshot(Process process, SupportReport report, Dictionary<string, object> modules)

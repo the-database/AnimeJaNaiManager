@@ -7,7 +7,10 @@ installation, videos, model files, or TensorRT engines.
    the player will not open.
 2. Click **Record a problem**. Reproduce it in the new player. For an intermittent
    problem, click **Mark problem now** while it is happening; you can mark more
-   than one moment and edit the notes between marks.
+   than one moment and edit the notes between marks. Each click asks the player
+   for its current video position and adds a numbered timestamp on a new line,
+   including after seeking. If the player cannot respond or no video is loaded,
+   the marker says **Playback time unavailable** instead of showing clock time.
 3. Click **Finish and save report**. The test player closes and Manager creates
    a ZIP. Use **Open report folder** and attach that ZIP to your bug report.
 
@@ -40,7 +43,7 @@ the destination and click **Retry saving report**; the recording is retained.
 | `recording/vulkan-loader.log` | Diagnostic instance's stderr, including Vulkan loader/layer messages |
 | `recording/timeline.jsonl` | UTC/playback times, renderer, decoder, frame-drop/sync counters, video/audio formats, subtitle settings and selected options. Samples once per second and at playback/seek events. Initial bindings help diagnose keyboard/layout issues. |
 | `recording/process.jsonl` and `modules.json` | Process memory/CPU/window state and observed loaded DLLs, including overlays, even when player initialization hangs |
-| `recording/markers.jsonl` | Moments marked by the user, with their current notes |
+| `recording/markers.jsonl` | Numbered problem markers with video position in seconds and formatted time, UTC click time, and the user's current notes |
 | `recording/result.json` | Recording/exit result, whether forced shutdown was necessary, and temporary launch overrides |
 | `previous-recording/` | Most recent interrupted recording, when one exists; use its own timestamps rather than assuming it describes the current run |
 

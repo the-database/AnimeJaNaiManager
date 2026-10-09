@@ -57,7 +57,31 @@ report.CaptureStartingSettings();
 File.AppendAllText(Path.Combine(data, "animejanai.conf"), "backend=TensorRT\n");
 File.WriteAllText(Path.Combine(report.Work, "timeline.jsonl"), JsonSerializer.Serialize(new {
     time_pos = 42, media = Path.Combine(root, "video.mkv"), token = "PRIVATE_JSON", url = "https://user:PRIVATE_URL@example.test/play?auth=PRIVATE_URL_QUERY" }) + "\n");
-report.Mark("Problem now");
+// Supply fresh IPC positions after forward/backward seeks. The periodic
+// timeline above deliberately still contains 42, so stale samples cannot pass.
+double?[] positions = [586.836, 1185.98, 35.5, null];
+var markerServer = Task.Run(async () =>
+{
+    foreach (double? position in positions)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var server = new NamedPipeServerStream("AJN-diagnostics-" + report.Id, PipeDirection.InOut, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        await server.WaitForConnectionAsync(timeout.Token);
+        using var reader = new StreamReader(server, leaveOpen: true);
+        string request = (await reader.ReadLineAsync(timeout.Token))!;
+        Check(request.Contains("get_property") && request.Contains("time-pos"), "Marker did not request current playback time");
+        using var writer = new StreamWriter(server, leaveOpen: true) { AutoFlush = true };
+        await writer.WriteLineAsync("{\"event\":\"seek\"}");
+        await writer.WriteLineAsync(JsonSerializer.Serialize(new { request_id = 1,
+            error = position.HasValue ? "success" : "property unavailable", data = position }));
+    }
+});
+var labels = new List<string>();
+foreach (var position in positions) labels.Add(await report.MarkAsync("Problem now"));
+await markerServer;
+Check(labels.SequenceEqual(new[] { "1. 00:09:46.836", "2. 00:19:45.980", "3. 00:00:35.500", "4. Playback time unavailable" }),
+    "Marker timestamps or numbering are incorrect: " + string.Join("; ", labels));
 string destination = await report.SaveAsync(output);
 using (var zip = ZipFile.OpenRead(destination))
 {
@@ -72,8 +96,16 @@ using (var zip = ZipFile.OpenRead(destination))
     Check(Read("settings/animejanai.conf").Contains("backend=TensorRT"), "Final config missing");
     Check(JsonNode.Parse(Read("report.json"))!["warnings"]!.AsArray().Count > 0, "Truncation not disclosed");
     _ = JsonNode.Parse(Read("recording/timeline.jsonl"));
+    var markers = Read("recording/markers.jsonl").Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(s => JsonNode.Parse(s)!).ToArray();
+    Check(markers.Length == positions.Length, "Report lost earlier problem markers");
+    for (int i = 0; i < markers.Length; i++)
+    {
+        Check(markers[i]["number"]!.GetValue<int>() == i + 1 && markers[i]["playback_time_seconds"]?.GetValue<double>() == positions[i], "Report marker position is incorrect");
+        Check(markers[i]["utc"] != null && markers[i]["note"]!.GetValue<string>() == "Problem now", "Marker lost UTC or notes");
+    }
 }
 Console.WriteLine("PASS bundle contents, redaction, valid JSON, log limits, initial/final config snapshots");
+Console.WriteLine("PASS current playback markers after forward/backward seeks, numbered history and unavailable position");
 
 // Use the test apphost as mpvnet.exe. Its dependencies stay beside it.
 foreach (string file in Directory.GetFiles(AppContext.BaseDirectory)) File.Copy(file, Path.Combine(root, Path.GetFileName(file)));

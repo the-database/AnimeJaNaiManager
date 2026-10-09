@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Input.Platform;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -17,6 +18,7 @@ public partial class DiagnosticsView : UserControl
 {
     private CancellationTokenSource? _finish;
     private Task? _operation;
+    private Task _markOperation = Task.CompletedTask;
     private SupportReport? _report;
     private string? _lastZip;
     private string _destination = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "AnimeJaNai Diagnostics");
@@ -45,12 +47,32 @@ public partial class DiagnosticsView : UserControl
     private void ClearVideo(object? sender, RoutedEventArgs args) => Control<TextBox>("MediaPath").Text = "";
     private async void RecordProblem(object? sender, RoutedEventArgs args) => await RunAsync(record: true);
     private async void SaveSnapshot(object? sender, RoutedEventArgs args) => await RunAsync(record: false);
-    private void FinishRecording(object? sender, RoutedEventArgs args)
-    { Control<Button>("FinishButton").IsEnabled = false; _finish?.Cancel(); }
-    private void MarkProblem(object? sender, RoutedEventArgs args)
+    private async void FinishRecording(object? sender, RoutedEventArgs args)
     {
-        _report?.Mark(Control<TextBox>("Notes").Text ?? "Problem visible now");
-        Control<TextBlock>("MarkerStatus").Text = "Problem marked at " + DateTime.Now.ToString("HH:mm:ss") + ". You can mark more than one moment.";
+        Control<Button>("FinishButton").IsEnabled = false;
+        await _markOperation;
+        _finish?.Cancel();
+    }
+    private async void MarkProblem(object? sender, RoutedEventArgs args)
+    {
+        if (_report == null || !_markOperation.IsCompleted) return;
+        Control<Button>("MarkButton").IsEnabled = false;
+        _markOperation = AddMarkerAsync(_report, Control<TextBox>("Notes").Text ?? "Problem visible now");
+        try { await _markOperation; }
+        finally { Control<Button>("MarkButton").IsEnabled = Control<Button>("MarkButton").IsVisible; }
+    }
+
+    private async Task AddMarkerAsync(SupportReport report, string note)
+    {
+        try
+        {
+            string marker = await report.MarkAsync(note);
+            var history = Control<TextBlock>("MarkerStatus");
+            history.Text = string.IsNullOrEmpty(history.Text) ? marker : history.Text + Environment.NewLine + marker;
+            Dispatcher.UIThread.Post(() => Control<ScrollViewer>("MarkerHistory").ScrollToEnd(), DispatcherPriority.Loaded);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { Control<TextBlock>("Status").Text = "Could not save the problem marker: " + ex.Message; }
     }
 
     private async Task RunAsync(bool record)
@@ -67,7 +89,7 @@ public partial class DiagnosticsView : UserControl
         Control<Button>("RetryButton").IsVisible = false;
         Control<TextBlock>("MarkerStatus").Text = "";
         _finish = new CancellationTokenSource();
-        var progress = new Progress<string>(s => Control<TextBlock>("Status").Text = s);
+        var progress = new Progress<string>(s => { if (IsBusy) Control<TextBlock>("Status").Text = s; });
         try
         {
             string? media = Control<TextBox>("MediaPath").Text;
@@ -80,6 +102,9 @@ public partial class DiagnosticsView : UserControl
                 catch (Exception ex) { _report.Warnings.Add("Recording failed: " + ex.Message); }
             }
             SetBusy(true, false);
+            // A last click can still be awaiting IPC when the player closes.
+            // Finish saving that marker before the report consumes its files.
+            await _markOperation;
             await ExportAsync(progress);
         }
         catch (Exception ex)
@@ -105,7 +130,7 @@ public partial class DiagnosticsView : UserControl
     {
         if (IsBusy || _report == null) return;
         SetBusy(true, false);
-        _operation = ExportAsync(new Progress<string>(s => Control<TextBlock>("Status").Text = s));
+        _operation = ExportAsync(new Progress<string>(s => { if (IsBusy) Control<TextBlock>("Status").Text = s; }));
         try { await _operation; }
         catch (Exception ex) { Control<TextBlock>("Status").Text = "Could not save the report: " + ex.Message; }
         finally { SetBusy(false, false); }
@@ -121,7 +146,7 @@ public partial class DiagnosticsView : UserControl
     }
 
     public async Task FinishBeforeCloseAsync()
-    { _finish?.Cancel(); if (_operation != null) { try { await _operation; } catch { /* Status already shows the error. */ } } }
+    { await _markOperation; _finish?.Cancel(); if (_operation != null) { try { await _operation; } catch { /* Status already shows the error. */ } } }
 
     private async void ChangeDestination(object? sender, RoutedEventArgs args)
     {

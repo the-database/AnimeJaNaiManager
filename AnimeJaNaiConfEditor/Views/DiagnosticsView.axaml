@@ -33,7 +33,9 @@
             <Button x:Name="MarkButton" Content="Mark problem now" Click="MarkProblem" IsVisible="False" Margin="0,0,8,8"/>
             <Button x:Name="FinishButton" Content="Finish and save report" Click="FinishRecording" IsVisible="False" Margin="0,0,8,8"/>
           </WrapPanel>
-          <TextBlock x:Name="MarkerStatus" TextWrapping="Wrap"/>
+          <ScrollViewer x:Name="MarkerHistory" MaxHeight="160" HorizontalScrollBarVisibility="Disabled">
+            <TextBlock x:Name="MarkerStatus" TextWrapping="Wrap"/>
+          </ScrollViewer>
           <ProgressBar x:Name="Progress" IsIndeterminate="True" IsVisible="False" Height="4"/>
           <TextBlock x:Name="Status" Text="Ready. Reports are saved locally; nothing is uploaded." TextWrapping="Wrap"/>
         </StackPanel>

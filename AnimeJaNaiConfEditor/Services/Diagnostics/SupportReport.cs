@@ -38,11 +38,22 @@ public sealed class SupportReport
         File.WriteAllText(Path.Combine(Work, "session.json"), JsonSerializer.Serialize(new { Id, StartedUtc, notes, media_selected = media != null }));
     }
 
-    public void Mark(string note)
+    public async Task<string> MarkAsync(string note)
     {
-        if (_markers++ >= 50) return;
+        DateTime utc = DateTime.UtcNow;
+        double? seconds = await SupportCapture.ReadPlaybackTimeAsync(this);
+        string? timestamp = null;
+        if (seconds is { } position)
+        {
+            var time = TimeSpan.FromMilliseconds(Math.Round(position * 1000));
+            timestamp = FormattableString.Invariant($"{(long)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}");
+        }
+        int number = _markers + 1;
         File.AppendAllText(Path.Combine(Work, "markers.jsonl"),
-            JsonSerializer.Serialize(new { utc = DateTime.UtcNow, note = note[..Math.Min(note.Length, 4000)] }) + "\n");
+            JsonSerializer.Serialize(new { number, utc, playback_time_seconds = seconds, playback_time = timestamp,
+                note = note[..Math.Min(note.Length, 4000)] }) + "\n");
+        _markers = number;
+        return $"{number}. {timestamp ?? "Playback time unavailable"}";
     }
 
     // Keep the original settings even when the user changes presets during recording.
