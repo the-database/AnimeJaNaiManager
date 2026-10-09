@@ -44,9 +44,12 @@ namespace AnimeJaNaiConfEditor.Views
 
         private async void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
         {
-            if (DataContext is MainWindowViewModel vm)
+            var diagnostics = this.FindControl<DiagnosticsView>("DiagnosticsPanel");
+            if (diagnostics?.IsBusy == true)
             {
-
+                e.Cancel = true;
+                await diagnostics.FinishBeforeCloseAsync();
+                Close();
             }
         }
 

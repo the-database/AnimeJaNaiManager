@@ -19,6 +19,7 @@
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Services\Diagnostics\capture.lua" LogicalName="AnimeJaNaiManager.Diagnostics.capture.lua" />
   </ItemGroup>
 
   <ItemGroup>

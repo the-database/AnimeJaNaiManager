@@ -38,7 +38,8 @@ namespace AnimeJaNaiConfEditor
             }
 
             StartActivationListener();
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            try { BuildAvaloniaApp().StartWithClassicDesktopLifetime(args); }
+            catch (Exception ex) { Services.Diagnostics.DiagnosticLog.Error(ex); throw; }
         }
 
         // Avalonia configuration, don't remove; also used by visual designer.

@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AnimeJaNaiConfEditor.ViewModels"
+        xmlns:views="using:AnimeJaNaiConfEditor.Views"
         xmlns:local="using:AnimeJaNaiConfEditor"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -765,6 +766,9 @@
         <TextBlock Text="{Binding ComponentManager.StatusLine}" TextWrapping="Wrap" Opacity="0.7"/>
       </StackPanel>
     </ScrollViewer>
+  </TabItem>
+  <TabItem Header="Troubleshooting">
+    <views:DiagnosticsView x:Name="DiagnosticsPanel"/>
   </TabItem>
   </TabControl>
 </Window>
