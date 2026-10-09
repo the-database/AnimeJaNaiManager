@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimeJaNaiConfEditor.Views.DiagnosticsView">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
+      <TextBlock Text="Troubleshooting" FontSize="24" FontWeight="SemiBold"/>
+      <TextBlock Text="Make one ZIP to send with your bug report. You don't need to find logs or share your installation."
+                 TextWrapping="Wrap" FontSize="15"/>
+      <StackPanel Spacing="6">
+        <TextBlock Text="What went wrong? (optional)" FontWeight="SemiBold"/>
+        <TextBox x:Name="Notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxLength="8000"
+                 PlaceholderText="Describe what you saw and how to reproduce it. For playback issues, mention the episode and time."/>
+      </StackPanel>
+      <StackPanel Spacing="6">
+        <TextBlock Text="Video to open (optional)" FontWeight="SemiBold"/>
+        <TextBlock Text="Leave this empty to troubleshoot a player that won't open. You can also open or drop a video into the test player."
+                   TextWrapping="Wrap" Opacity="0.7"/>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <TextBox x:Name="MediaPath" IsReadOnly="True" PlaceholderText="No video selected"/>
+          <Button Grid.Column="1" x:Name="BrowseButton" Content="Choose video…" Click="ChooseVideo"/>
+          <Button Grid.Column="2" x:Name="ClearButton" Content="Clear" Click="ClearVideo"/>
+        </Grid>
+      </StackPanel>
+      <Border Classes="border" Margin="0" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="1. Start recording.   2. Reproduce the issue.   3. Finish and send the ZIP."
+                     FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="A new player opens with your current settings. Finish closes that test player; recording also ends when it closes or after 5 minutes. Other player windows are left alone."
+                     TextWrapping="Wrap" Opacity="0.8"/>
+          <WrapPanel Orientation="Horizontal">
+            <Button x:Name="RecordButton" Content="Record a problem" Classes="active" Click="RecordProblem" Margin="0,0,8,8"/>
+            <Button x:Name="SnapshotButton" Content="Save diagnostics without recording" Click="SaveSnapshot" Margin="0,0,8,8"/>
+            <Button x:Name="MarkButton" Content="Mark problem now" Click="MarkProblem" IsVisible="False" Margin="0,0,8,8"/>
+            <Button x:Name="FinishButton" Content="Finish and save report" Click="FinishRecording" IsVisible="False" Margin="0,0,8,8"/>
+          </WrapPanel>
+          <TextBlock x:Name="MarkerStatus" TextWrapping="Wrap"/>
+          <ProgressBar x:Name="Progress" IsIndeterminate="True" IsVisible="False" Height="4"/>
+          <TextBlock x:Name="Status" Text="Ready. Reports are saved locally; nothing is uploaded." TextWrapping="Wrap"/>
+        </StackPanel>
+      </Border>
+      <Border x:Name="ResultPanel" Classes="border" IsVisible="False" Padding="16" Margin="0">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Your report is ready" FontSize="18" FontWeight="SemiBold"/>
+          <TextBlock Text="Send this ZIP with your bug report. You can open it and review the text files first." TextWrapping="Wrap"/>
+          <SelectableTextBlock x:Name="ReportPath" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Open report folder" Click="OpenReportFolder"/>
+            <Button Content="Copy file path" Click="CopyReportPath"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+      <StackPanel Spacing="6">
+        <TextBlock Text="What's included" FontWeight="SemiBold"/>
+        <TextBlock Text="Settings and recent configuration backups, player and engine-build logs, component versions, GPU/driver/display/HDR details, and diagnostic playback/process data. Video, model and engine files, screenshots, and playback history are excluded."
+                   TextWrapping="Wrap" Opacity="0.8"/>
+        <TextBlock Text="Personal folders and common passwords/tokens are masked. File names and your notes may remain, so review the ZIP before posting it publicly. Logging can affect performance slightly."
+                   TextWrapping="Wrap" Opacity="0.8"/>
+      </StackPanel>
+      <TextBlock x:Name="Destination" TextWrapping="Wrap" Opacity="0.7"/>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="DestinationButton" Content="Change report folder…" Click="ChangeDestination"/>
+        <Button x:Name="RetryButton" Content="Retry saving report" Click="RetrySave" IsVisible="False"/>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

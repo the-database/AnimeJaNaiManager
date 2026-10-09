@@ -26,8 +26,10 @@ namespace AnimeJaNaiConfEditor
             // FluentAvalonia dialog bug) is posted to the UI dispatcher and would otherwise
             // crash the whole app. Swallow it here so a single dialog failure degrades to a
             // no-op instead of taking down the Manager.
-            Dispatcher.UIThread.UnhandledException += (_, e) => e.Handled = true;
-            TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();
+            Dispatcher.UIThread.UnhandledException += (_, e) =>
+            { Services.Diagnostics.DiagnosticLog.Error(e.Exception); e.Handled = true; };
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            { Services.Diagnostics.DiagnosticLog.Error(e.Exception); e.SetObserved(); };
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
