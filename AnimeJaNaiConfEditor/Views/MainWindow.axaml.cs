@@ -352,16 +352,18 @@ namespace AnimeJaNaiConfEditor.Views
             const string runResult = "run";
             var td = new FATaskDialog
             {
-                Title = "Run playback benchmark",
+                Title = "Run native-display benchmark",
                 Content = new TextBlock
                 {
                     TextWrapping = TextWrapping.Wrap,
                     MaxWidth = 460,
                     Text =
-                        "This measures your real playback fps across several resolutions for the " +
-                        "Balanced and Performance templates.\n\n" +
-                        "mpv windows will open and close on their own while it runs. Do not close " +
-                        "or click them, or the results will be invalid.\n\n" +
+                        "This measures maximum decode, upscale, and rendering throughput for the " +
+                        "Balanced and Performance templates at five input resolutions. The player " +
+                        "renders fullscreen on your display, and records the actual output resolution " +
+                        "for the catalog. Audio, subtitles, and presentation sync are disabled.\n\n" +
+                        "mpv windows will open and close on their own. Leave them visible; do not " +
+                        "resize, minimize, pause, or close them while the benchmark runs.\n\n" +
                         "The first run builds a TensorRT engine per resolution (about a minute " +
                         "each, cached afterward), so the whole benchmark can take 10+ minutes depending on your hardware.",
                 },
@@ -471,6 +473,12 @@ namespace AnimeJaNaiConfEditor.Views
                 Opacity = .6,
                 FontSize = 11,
                 Text = "Data to submit:",
+            });
+            panel.Children.Add(new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                Text = sub.Measurement?.Description ?? "Legacy benchmark: measurement method and output display are unknown.",
+                Margin = new Thickness(0, 0, 0, 6),
             });
             panel.Children.Add(preview);
             panel.Children.Add(submittedBy);
