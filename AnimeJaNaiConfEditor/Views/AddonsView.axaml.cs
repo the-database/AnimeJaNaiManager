@@ -40,7 +40,7 @@ public partial class AddonsView : UserControl
         AvaloniaXamlLoader.Load(this);
         Loaded += async (_, _) =>
         {
-            if (!Design.IsDesignMode && client?.IsConnected != true && !HasUnsavedSettings())
+            if (OperatingSystem.IsWindows() && !Design.IsDesignMode && client?.IsConnected != true && !HasUnsavedSettings())
                 await RunAsync(ConnectAsync, announceSuccess: false);
         };
         refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };

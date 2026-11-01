@@ -104,6 +104,10 @@ public partial class AddonsView
             TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold });
         if (protocol == "http") content.Children.Add(new TextBlock { Text = "HTTP traffic is unencrypted.", TextWrapping = TextWrapping.Wrap });
         content.Children.Add(new TextBlock { Text = "Approved addresses: " + string.Join(", ", ((JsonArray)reviewed["addresses"]!).Select(a => a!.GetValue<string>())), TextWrapping = TextWrapping.Wrap });
+        if (((JsonArray)reviewed["addresses"]!).Any(n => System.Net.IPAddress.TryParse(n!.GetValue<string>(), out var ip) &&
+            (System.Net.IPAddress.IsLoopback(ip) || ip.IsIPv6LinkLocal ||
+             ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && ip.GetAddressBytes()[0] == 169 && ip.GetAddressBytes()[1] == 254)))
+            content.Children.Add(new TextBlock { Text = "This address reaches a service on this PC or its local link. It may expose private device or cloud metadata. Approve it only if this is the service you intended.", TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold });
         content.Children.Add(new TextBlock { Text = "These addresses remain fixed to this approval. Review the address again if the service moves. You can remove access from the addon page.", TextWrapping = TextWrapping.Wrap });
         if (!await ConsentAsync(owner, content, "Allow service")) return;
         await CallAsync("network.approveDestination", new() { ["id"] = id, ["expectedHash"] = hash, ["name"] = name, ["reviewId"] = reviewed["reviewId"]!.DeepClone() });

@@ -20,9 +20,8 @@ public partial class AddonsView
         {
             if (approved) return;
             if (confirming) { args.Cancel = true; return; }
-            if (!HasUnsavedSettings() && !busy) return;
+            if (!HasUnsavedSettings()) { await CloseAsync(); return; }
             args.Cancel = true;
-            if (busy) { Control<TextBlock>("Status").Text = "Please wait for the current addon operation to finish before closing Manager."; return; }
             confirming = true;
             try
             {

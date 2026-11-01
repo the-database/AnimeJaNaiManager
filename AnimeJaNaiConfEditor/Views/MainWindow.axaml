@@ -779,7 +779,7 @@
       </StackPanel>
     </ScrollViewer>
   </TabItem>
-  <TabItem Header="Addons">
+  <TabItem Header="Addons" x:Name="AddonsTab">
     <views:AddonsView x:Name="AddonPanel"/>
   </TabItem>
   <TabItem Header="Troubleshooting">
