@@ -88,8 +88,36 @@ internal static class UsabilityUiChecks
         {
             await Until(() => view.FindControl<Button>("RetryButton")!.IsVisible);
             Check(!view.FindControl<Button>("InstallButton")!.IsEnabled && view.FindControl<TextBlock>("Status")!.Text!.Contains("Extract the complete"), "Missing files should offer recovery and keep install unavailable");
+            Check(!File.Exists(Path.Combine(root, ".ajn-addon-activity.lock")), "Visiting a build without addon support created an installation lock");
             using (var frame = window.CaptureRenderedFrame()) frame!.Save(Path.Combine(output, "addon-missing-runtime.png"));
             File.WriteAllText(Path.Combine(output, "missing-runtime-results.json"), "{\"passed\":true,\"checks\":[\"automatic startup failure\",\"missing file recovery\",\"retry offered without granting anything\"]}");
+        }
+        finally { await view.CloseAsync(); window.Close(); }
+    }
+
+    internal static async Task ClosingStartupAsync(string output)
+    {
+        string root = Path.Combine(output, "unresponsive-host");
+        Directory.CreateDirectory(Path.Combine(root, "addon-host/runtime"));
+        File.WriteAllBytes(Path.Combine(root, "addon-host/ajn-addon.exe"), []);
+        File.WriteAllBytes(Path.Combine(root, "addon-host/runtime/wasmtime.exe"), []);
+        Environment.SetEnvironmentVariable("ANIMEJANAI_ROOT", root);
+        Environment.SetEnvironmentVariable("ANIMEJANAI_DATA_DIR", Path.Combine(root, "data"));
+        using var server = new System.IO.Pipes.NamedPipeServerStream(AnimeJaNai.Addons.Management.ManagementClient.PipeName(Path.Combine(root, "data/addons")),
+            System.IO.Pipes.PipeDirection.InOut, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+        var view = new AddonsView(); var window = new Window { Content = view };
+        view.ProtectUnsavedSettingsOnClose(window);
+        window.Show();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await server.WaitForConnectionAsync(deadline.Token);
+            // Hold the handshake open to reproduce a real busy startup.
+            window.Close();
+            Check(!window.IsVisible, "An unresponsive addon host prevented Manager from closing");
+            byte[] buffer = new byte[4096];
+            while (await server.ReadAsync(buffer, deadline.Token) != 0) { }
+            File.WriteAllText(Path.Combine(output, "startup-close-results.json"), "{\"passed\":true,\"checks\":[\"unresponsive handshake cancelled on close\"]}");
         }
         finally { await view.CloseAsync(); window.Close(); }
     }

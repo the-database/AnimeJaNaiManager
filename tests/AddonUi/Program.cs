@@ -13,14 +13,26 @@ using System.Text.Json.Nodes;
 
 if (args.Length is not (1 or 2)) { Console.WriteLine("AddonUi <new-output-directory> [integrated-preview-root]"); return 2; }
 string output = Path.GetFullPath(args[0]); Directory.CreateDirectory(output);
+string? focusedCase = Environment.GetEnvironmentVariable("AJN_UI_CASE");
 Environment.SetEnvironmentVariable("ANIMEJANAI_DATA_DIR", Path.Combine(output, "data"));
 Environment.SetEnvironmentVariable("ANIMEJANAI_ROOT", args.Length == 2 ? Path.GetFullPath(args[1]) : output);
-await using var server = args.Length == 1 ? new FixtureServer(Path.Combine(output, "data", "addons")) : null;
+if (args.Length == 1)
+{
+    Directory.CreateDirectory(Path.Combine(output, "addon-host/runtime"));
+    File.WriteAllBytes(Path.Combine(output, "addon-host/ajn-addon.exe"), []);
+    File.WriteAllBytes(Path.Combine(output, "addon-host/runtime/wasmtime.exe"), []);
+}
+await using var server = args.Length == 1 && focusedCase is null ? new FixtureServer(Path.Combine(output, "data", "addons")) : null;
 var session = HeadlessUnitTestSession.StartNew(typeof(TestApp));
 try
 {
 await session.Dispatch<bool>(async () =>
 {
+    // MainWindowViewModel captures the installation paths once per process.
+    // Startup cases need their own process rather than changing those globals
+    // after the ordinary UI fixture has initialized them.
+    if (focusedCase == "startup-close") { await UsabilityUiChecks.ClosingStartupAsync(output); return true; }
+    if (focusedCase == "missing-runtime") { await UsabilityUiChecks.MissingRuntimeAsync(output); return true; }
     if (args.Length == 2) return await RealHostChecks.RunAsync(output, Path.GetFullPath(args[1]));
     Application.Current!.RequestedThemeVariant = ThemeVariant.Dark;
     var view = new AddonsView();
@@ -163,7 +175,6 @@ await session.Dispatch<bool>(async () =>
     await ListenerUiChecks.RunAsync(view, window, server, output);
     await UsabilityUiChecks.RunAsync(view, window, server, output);
     await view.CloseAsync(); window.Close();
-    await UsabilityUiChecks.MissingRuntimeAsync(output);
     File.WriteAllText(Path.Combine(output, "results.json"), "{\"passed\":true,\"checks\":[\"typed settings\",\"save and reload\",\"incompatible setting repair\",\"action\",\"start/stop\",\"permissions default denied\",\"exact selected grant\",\"review hash\",\"media consent cancellation\",\"exact file and package consent\",\"saved profile snapshot\",\"media access revocation\",\"destination consent cancellation\",\"reviewed destination and package\",\"masked credential consent\",\"credential removal preserves destination\",\"destination removal preserves media\",\"output permissions default denied\",\"output permission review cancellation\",\"media output destination disclosure\",\"media input permissions default denied\",\"media input review cancellation\",\"media input destination disclosure\",\"listener controls require permission\",\"local listener consent cancellation\",\"listener package hash binding\",\"listener access removal\",\"HTTPS certificate control\",\"public listener and CORS disclosure\",\"public listener consent cancellation\"]}");
     return true;
 }, CancellationToken.None);

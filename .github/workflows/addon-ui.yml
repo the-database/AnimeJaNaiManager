@@ -2,7 +2,7 @@ name: Addon Manager UI
 
 on:
   push:
-    branches: [main, integration/addons, feature/addon-manager]
+    branches: [main]
   pull_request:
     paths: ['AnimeJaNaiConfEditor/**', 'tests/AddonUi/**', '.github/workflows/addon-ui.yml']
   workflow_dispatch:
@@ -21,11 +21,22 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Verify and render addon controls
         shell: pwsh
-        run: dotnet run --project ./tests/AddonUi/AddonUi.csproj -c Release '-p:UsedAvaloniaProducts=' -- ./addon-ui-results
+        run: |
+          dotnet run --project ./tests/AddonUi/AddonUi.csproj -c Release '-p:UsedAvaloniaProducts=' -- ./addon-ui-results
+          if ($LASTEXITCODE) { throw 'Addon UI checks failed' }
+          foreach ($case in 'startup-close', 'missing-runtime') {
+            $env:AJN_UI_CASE = $case
+            dotnet run --no-build --project ./tests/AddonUi/AddonUi.csproj -c Release -- "./addon-ui-results/$case"
+            if ($LASTEXITCODE) { throw "Addon startup check failed: $case" }
+          }
+          Remove-Item Env:AJN_UI_CASE
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: 422415/mpv-AnimeJaNai
-          ref: 6a09effb1924aeceffa8f88d4042deb144e7908e
+          repository: the-database/mpv-AnimeJaNai
+          # Coordinated review source owned by the upstream PR. Switch to the
+          # merged source commit when the host PR lands; releases only verify
+          # the in-tree snapshot and never need this checkout.
+          ref: refs/pull/227/head
           path: host-source
       - name: Prepare the matching packaged host
         shell: pwsh
