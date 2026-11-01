@@ -909,6 +909,7 @@ chain_2_rife=no";
                                 //RifeModel = parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_model"),
                                 RifeEnsemble = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_ensemble")),
                                 RifeBeforeUpscale = parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_before_upscale") is { } rbu ? ParseBool(rbu) : true,
+                                RifeFp16Warp = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_fp16_warp")),
                             };
 
                             if (int.TryParse(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_factor_numerator"), ENGLISH_CULTURE, out var numerator))
@@ -997,6 +998,7 @@ chain_2_rife=no";
                             EnableRife = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife")),
                             RifeEnsemble = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_ensemble")),
                             RifeBeforeUpscale = parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_before_upscale") is { } rbu ? ParseBool(rbu) : true,
+                                RifeFp16Warp = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_fp16_warp")),
                         };
 
                         if (int.TryParse(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_factor_numerator"), ENGLISH_CULTURE, out var numerator))
@@ -1204,6 +1206,7 @@ chain_2_rife=no";
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_scene_detect_threshold", string.Create(ENGLISH_CULTURE, $"{chain.RifeSceneDetectThreshold ?? 0.015M}"));
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_ensemble", chain.RifeEnsemble ? "yes" : "no");
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_before_upscale", chain.RifeBeforeUpscale ? "yes" : "no");
+                    parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_fp16_warp", chain.RifeFp16Warp ? "yes" : "no");
                 }
             }
 
@@ -1248,6 +1251,7 @@ chain_2_rife=no";
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_ensemble", chain.RifeEnsemble ? "yes" : "no");
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_scene_detect_threshold", string.Create(ENGLISH_CULTURE, $"{chain.RifeSceneDetectThreshold ?? 0.015M}"));
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_before_upscale", chain.RifeBeforeUpscale ? "yes" : "no");
+                    parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_fp16_warp", chain.RifeFp16Warp ? "yes" : "no");
             }
 
             return parser;
@@ -1863,7 +1867,8 @@ chain_2_rife=no";
                     x => x.RifeModel,
                     x => x.RifeSceneDetectThreshold,
                     x => x.RifeEnsemble,
-                    x => x.RifeBeforeUpscale
+                    x => x.RifeBeforeUpscale,
+                    x => x.RifeFp16Warp
                 );
 
                 var g3 = this.WhenAnyValue(
@@ -2180,6 +2185,14 @@ chain_2_rife=no";
         {
             get => _rifeBeforeUpscale;
             set => this.RaiseAndSetIfChanged(ref _rifeBeforeUpscale, value);
+        }
+
+        private bool _rifeFp16Warp = false;
+        [DataMember]
+        public bool RifeFp16Warp
+        {
+            get => _rifeFp16Warp;
+            set => this.RaiseAndSetIfChanged(ref _rifeFp16Warp, value);
         }
 
         // Upscaling off (chain_N_upscale=no) keeps the models in the conf; the engine skips them

@@ -12,6 +12,27 @@ try
         "[slot_1]\nprofile_name=Round trip\nchain_1_rife=yes\nchain_1_rife_ensemble=yes\n");
     var vm = new MainWindowViewModel();
     vm.SelectedSlotNumber = "1";
+    if (vm.CurrentSlot.Chains[0].RifeFp16Warp)
+        throw new Exception("RIFE FP16 warp must default to off");
+    foreach (bool enabled in new[] { true, false })
+    {
+        vm.CurrentSlot.Chains[0].RifeFp16Warp = enabled;
+        if (vm.ReadAnimeJaNaiConf(Path.Combine(data, "animejanai.conf")).UpscaleSlots
+                .First(s => s.SlotNumber == "1").Chains[0].RifeFp16Warp != enabled)
+            throw new Exception($"Autosave lost RIFE FP16 warp={enabled}");
+        string full = Path.Combine(data, $"warp-full-{enabled}.conf");
+        vm.WriteAnimeJaNaiConf(full);
+        if (vm.ReadAnimeJaNaiConf(full).UpscaleSlots.First(s => s.SlotNumber == "1")
+                .Chains[0].RifeFp16Warp != enabled)
+            throw new Exception($"Full config lost RIFE FP16 warp={enabled}");
+        string profile = Path.Combine(data, $"warp-profile-{enabled}.conf");
+        vm.WriteAnimeJaNaiCurrentProfileConf(profile);
+        vm.CurrentSlot.Chains[0].RifeFp16Warp = !enabled;
+        vm.ReadAnimeJaNaiConfToCurrentSlot(profile, false);
+        if (vm.CurrentSlot.Chains[0].RifeFp16Warp != enabled)
+            throw new Exception($"Profile import lost RIFE FP16 warp={enabled}");
+        Console.WriteLine($"PASS RIFE FP16 warp={enabled} full/profile round trip and autosave");
+    }
     if (vm.AnimeJaNaiConf.AutoDisplayRefresh)
         throw new Exception("Automatic display refresh must default to off");
     foreach (bool enabled in new[] { true, false })

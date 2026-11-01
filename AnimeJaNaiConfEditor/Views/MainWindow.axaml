@@ -715,6 +715,9 @@
                           <ContentControl Classes="hint" ToolTip.Tip="Run RIFE at the source resolution before upscaling (faster, recommended). Uncheck to interpolate the upscaled frames instead. Chains with a temporal model or temporal fix always interpolate after upscaling.">
                             <CheckBox IsChecked="{Binding RifeBeforeUpscale}" Content="Interpolate before upscaling" />
                           </ContentControl>
+                          <ContentControl Classes="hint" ToolTip.Tip="Optional FP16 warp for non-ensemble RIFE 4.22 at 1080p on supported NVIDIA GPUs. Requires the experimental TensorRT plugin bundle; otherwise the player uses standard RIFE. Off by default. Speed and rounding may differ.">
+                            <CheckBox IsChecked="{Binding RifeFp16Warp}" Content="Experimental FP16 warp" />
+                          </ContentControl>
                         </StackPanel>
                       </StackPanel>
                     </Expander>
