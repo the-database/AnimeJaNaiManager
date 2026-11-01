@@ -30,6 +30,9 @@ namespace AnimeJaNaiConfEditor.Services
         public const string CatalogUrl = "https://benchmarks.animejan.ai";
 
         [JsonPropertyName("schema")] public int Schema { get; set; } = 1;
+        [JsonPropertyName("measurement")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public BenchmarkMeasurement? Measurement { get; set; }
         [JsonPropertyName("app_version")] public string AppVersion { get; set; } = "";
         [JsonPropertyName("backend")] public string Backend { get; set; } = "";
         [JsonPropertyName("gpu")] public string Gpu { get; set; } = "";
@@ -76,7 +79,9 @@ namespace AnimeJaNaiConfEditor.Services
 
         public string ToPreviewJson() => JsonSerializer.Serialize(this, PreviewOpts);
 
-        // Parse animejanai/benchmark.txt exactly as benchmark.ps1 writes it:
+        // Parse animejanai/benchmark.txt, including v2 measurement metadata.
+        // Files from the old runners remain schema 1; never guess their mode
+        // or output resolution from the screen connected at submission time.
         //
         //   AnimeJaNai inference benchmark - backend: TensorRT
         //   <blank>
@@ -90,11 +95,23 @@ namespace AnimeJaNaiConfEditor.Services
         public static BenchmarkSubmission FromBenchmarkFile(string path)
         {
             var sub = new BenchmarkSubmission();
+            bool v2 = false;
             string[] cols = Array.Empty<string>();
             foreach (var raw in File.ReadAllLines(path))
             {
                 var line = raw.Trim();
                 if (line.Length == 0) continue;
+                if (line.StartsWith("AnimeJaNai benchmark v2", StringComparison.Ordinal)) v2 = true;
+
+                if (line.StartsWith(BenchmarkMeasurement.Header, StringComparison.Ordinal))
+                {
+                    if (sub.Measurement != null) throw new InvalidDataException("Duplicate benchmark metadata.");
+                    sub.Measurement = JsonSerializer.Deserialize<BenchmarkMeasurement>(line[BenchmarkMeasurement.Header.Length..])
+                        ?? throw new InvalidDataException("Missing benchmark metadata.");
+                    sub.Measurement.Validate();
+                    sub.Schema = 2;
+                    continue;
+                }
 
                 if (!line.StartsWith("|"))
                 {
@@ -120,6 +137,8 @@ namespace AnimeJaNaiConfEditor.Services
                 }
                 if (row.Count > 0) sub.Results[cells[0]] = row;
             }
+            if (v2 && sub.Measurement == null)
+                throw new InvalidDataException("The v2 benchmark is missing its measurement metadata. Rerun the benchmark.");
             return sub;
         }
 
