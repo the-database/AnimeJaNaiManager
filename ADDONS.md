@@ -1,6 +1,6 @@
 # Addon Manager developer preview
 
-Opening Addons automatically starts or connects to the local companion service in `mpv-AnimeJaNai/addons`. The coordinated branches are named `integration/addons` and build on current upstream. End users do not configure a host address or connection.
+Opening Addons automatically starts or connects to the local companion service in `mpv-AnimeJaNai/addons`. The API 1.12 integration is based on AJN 3.9.0. See [ADDON-API-REVIEW.md](ADDON-API-REVIEW.md) for the review map and matching host dependency. End users do not configure a host address or connection.
 
 The assembler puts the host at `<AJN root>/addon-host/ajn-addon.exe`, the launcher beside it, and pinned Wasmtime at `addon-host/runtime/wasmtime.exe`. The service starts on demand without a console. Development tests can set `ANIMEJANAI_ROOT` and `ANIMEJANAI_DATA_DIR`; data lives under `<data directory>/addons`.
 

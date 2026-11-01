@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: 422415/mpv-AnimeJaNai
-          ref: aa49f9a87a13b425b9dc363b6c700df52cc8263d
+          ref: 6a09effb1924aeceffa8f88d4042deb144e7908e
           path: host-source
       - name: Prepare the matching packaged host
         shell: pwsh
