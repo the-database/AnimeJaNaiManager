@@ -36,10 +36,8 @@ internal static class RealHostChecks
         try
         {
             await Until(() => Find<Button>("InstallButton").IsEnabled);
-            await HostSettingsPackagedChecks.RunAsync(view, window, output);
             string hostPath = Path.Combine(root, "addon-host", "ajn-addon.exe");
-            host = await ServiceProcessAsync(data, hostPath);
-            _ = host.SafeHandle; // Retain a process handle so ExitCode remains available after idle exit.
+            Check(!File.Exists(Path.Combine(root, ".ajn-addon-activity.lock")), "An empty Addons tab started the host");
             var installing = view.ReviewPackageAsync(Path.Combine(root, "addon-development", "counter.ajnaddon"), window);
             await Until(() => window.OwnedWindows.Count > 0);
             var review = window.OwnedWindows.Single();
@@ -49,6 +47,9 @@ internal static class RealHostChecks
             review.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Install").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await installing;
             Click("RefreshButton"); await Until(() => Find<Button>("RefreshButton").IsEnabled);
+            host = await ServiceProcessAsync(data, hostPath);
+            _ = host.SafeHandle; // Retain a process handle so ExitCode remains available after idle exit.
+            await HostSettingsPackagedChecks.RunAsync(view, window, output);
             Check(Find<Button>("StartButton").IsEnabled && Find<Button>("SaveButton").IsEnabled, "Installed addon controls stayed disabled");
             Check(Find<TextBlock>("AddonState").Text!.Contains("Running"), "Approved addon did not auto-activate");
             Find<StackPanel>("SettingFields").Children.OfType<StackPanel>().Single().Children.OfType<TextBox>().Single().Text = "Integration 日本語";
@@ -56,7 +57,7 @@ internal static class RealHostChecks
             Click("StartButton"); await Until(() => Find<Button>("StartButton").IsEnabled);
             await view.CloseAsync(); window.Close();
             view = new AddonsView(); window = WindowFor(view); window.Show();
-            await Until(() => Find<Button>("InstallButton").IsEnabled);
+            await Until(() => Find<Button>("RefreshButton").IsEnabled);
             Check(Find<StackPanel>("SettingFields").Children.OfType<StackPanel>().Single().Children.OfType<TextBox>().Single().Text == "Integration 日本語", "Real settings did not survive reconnect");
             async Task<int> CountAsync()
             {
@@ -70,8 +71,8 @@ internal static class RealHostChecks
             Click("StartButton"); await Until(() => Find<Button>("StartButton").IsEnabled);
             Check(await CountAsync() == 2, "Restart did not preserve private storage");
             host.Kill(entireProcessTree: true); await host.WaitForExitAsync();
-            await Until(() => Find<Button>("RetryButton").IsVisible && !Find<Button>("InstallButton").IsEnabled);
-            Click("RetryButton"); await Until(() => Find<Button>("InstallButton").IsEnabled);
+            await Until(() => Find<Button>("RetryButton").IsVisible && !Find<Button>("RefreshButton").IsEnabled);
+            Click("RetryButton"); await Until(() => Find<Button>("RefreshButton").IsEnabled);
             host.Dispose(); host = null;
             host = await ServiceProcessAsync(data, hostPath);
             _ = host.SafeHandle;

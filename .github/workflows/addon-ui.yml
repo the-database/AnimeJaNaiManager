@@ -24,7 +24,7 @@ jobs:
         run: |
           dotnet run --project ./tests/AddonUi/AddonUi.csproj -c Release '-p:UsedAvaloniaProducts=' -- ./addon-ui-results
           if ($LASTEXITCODE) { throw 'Addon UI checks failed' }
-          foreach ($case in 'startup-close', 'missing-runtime') {
+          foreach ($case in 'startup-close', 'missing-runtime', 'empty-installation') {
             $env:AJN_UI_CASE = $case
             dotnet run --no-build --project ./tests/AddonUi/AddonUi.csproj -c Release -- "./addon-ui-results/$case"
             if ($LASTEXITCODE) { throw "Addon startup check failed: $case" }
@@ -33,10 +33,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: the-database/mpv-AnimeJaNai
-          # Coordinated review source owned by the upstream PR. Switch to the
-          # merged source commit when the host PR lands; releases only verify
-          # the in-tree snapshot and never need this checkout.
-          ref: refs/pull/227/head
+          # Immutable pre-merge source from host PR 227, not merged main yet.
+          # Switch to the merged main commit when it lands. Releases only
+          # verify the in-tree snapshot and never need this checkout.
+          ref: 65d7fc761048cb070575173021bc578cc0477776
           path: host-source
       - name: Prepare the matching packaged host
         shell: pwsh

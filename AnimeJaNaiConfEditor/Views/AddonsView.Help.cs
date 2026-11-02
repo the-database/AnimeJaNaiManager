@@ -15,12 +15,15 @@ public partial class AddonsView
 {
     internal void ProtectUnsavedSettingsOnClose(Window owner)
     {
+        owner.Closed += async (_, _) => await CloseAsync();
         bool approved = false, confirming = false;
         owner.Closing += async (_, args) =>
         {
             if (approved) return;
             if (confirming) { args.Cancel = true; return; }
-            if (!HasUnsavedSettings()) { await CloseAsync(); return; }
+            // Another handler (for example diagnostics) can still cancel this
+            // close. Dispose the connection only after the window has closed.
+            if (!HasUnsavedSettings()) return;
             args.Cancel = true;
             confirming = true;
             try

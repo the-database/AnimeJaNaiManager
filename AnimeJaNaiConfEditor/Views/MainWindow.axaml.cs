@@ -30,11 +30,10 @@ namespace AnimeJaNaiConfEditor.Views
         public MainWindow()
         {
             AvaloniaXamlLoader.Load(this);
-            if (this.FindControl<TabItem>("AddonsTab") is { } addonsTab) addonsTab.IsVisible = OperatingSystem.IsWindows();
+            if (this.FindControl<TabItem>("AddonsTab") is { } addonsTab) addonsTab.IsVisible = AddonsView.SupportInstalled;
             this.FindControl<AddonsView>("AddonPanel")?.ProtectUnsavedSettingsOnClose(this);
             Closing += MainWindow_Closing;
             Opened += MainWindow_Opened;
-            Closed += async (_, _) => { if (this.FindControl<AddonsView>("AddonPanel") is { } addons) await addons.CloseAsync(); };
         }
 
         private async void MainWindow_Opened(object? sender, EventArgs e)

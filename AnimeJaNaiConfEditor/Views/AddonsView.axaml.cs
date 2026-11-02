@@ -32,6 +32,15 @@ public partial class AddonsView : UserControl
     private string DataDirectory => Path.Combine(MainWindowViewModel.DataDir, "addons");
     private string HostPath => Path.Combine(MainWindowViewModel.RootDir, "addon-host", "ajn-addon.exe");
     private string RuntimePath => Path.Combine(MainWindowViewModel.RootDir, "addon-host", "runtime", "wasmtime.exe");
+    internal static bool SupportInstalled => OperatingSystem.IsWindows() &&
+        File.Exists(Path.Combine(MainWindowViewModel.RootDir, "addon-host", "ajn-addon.exe")) &&
+        File.Exists(Path.Combine(MainWindowViewModel.RootDir, "addon-host", "runtime", "wasmtime.exe"));
+    private bool HasInstalledAddons()
+    {
+        string installed = Path.Combine(DataDirectory, "installed");
+        return Directory.Exists(installed) && Directory.EnumerateDirectories(installed)
+            .Take(128).Any(d => File.Exists(Path.Combine(d, "active.json")));
+    }
     private string? SelectedId => (Control<ListBox>("AddonList").SelectedItem as ListBoxItem)?.Tag as string;
     private T Control<T>(string name) where T : Control => this.FindControl<T>(name)!;
 
@@ -40,8 +49,13 @@ public partial class AddonsView : UserControl
         AvaloniaXamlLoader.Load(this);
         Loaded += async (_, _) =>
         {
-            if (OperatingSystem.IsWindows() && !Design.IsDesignMode && client?.IsConnected != true && !HasUnsavedSettings())
+            if (SupportInstalled && HasInstalledAddons() && !Design.IsDesignMode && client?.IsConnected != true && !HasUnsavedSettings())
                 await RunAsync(ConnectAsync, announceSuccess: false);
+            else if (client?.IsConnected != true)
+            {
+                Control<TextBlock>("Status").Text = "Choose Install addon to get started.";
+                UpdateButtons();
+            }
         };
         refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         refreshTimer.Tick += async (_, _) =>
@@ -64,9 +78,7 @@ public partial class AddonsView : UserControl
     {
         await RunAsync(async () =>
         {
-            if (!OperatingSystem.IsWindows() || !File.Exists(HostPath)) return;
-            string installed = Path.Combine(DataDirectory, "installed");
-            if (Directory.Exists(installed) && Directory.EnumerateDirectories(installed).Take(128).Any(d => File.Exists(Path.Combine(d, "active.json"))))
+            if (SupportInstalled && HasInstalledAddons())
                 await ConnectAsync();
         }, announceSuccess: false);
     }
@@ -229,9 +241,10 @@ public partial class AddonsView : UserControl
     private void UpdateButtons()
     {
         bool connected = client?.IsConnected == true;
-        Control<Button>("RetryButton").IsVisible = !connected && !busy;
+        Control<Button>("RetryButton").IsVisible = !connected && !busy && HasInstalledAddons();
         Control<Button>("RetryButton").IsEnabled = !busy;
-        foreach (string name in new[] { "InstallButton", "RefreshButton" }) Control<Button>(name).IsEnabled = connected && !busy;
+        Control<Button>("InstallButton").IsEnabled = SupportInstalled && !busy;
+        Control<Button>("RefreshButton").IsEnabled = connected && !busy;
         Control<Button>("HostSettingsButton").IsVisible = connected && client?.ServerInfo["hostSettingsAvailable"]?.GetValue<bool>() == true;
         Control<Button>("HostSettingsButton").IsEnabled = connected && !busy;
         Control<Button>("LoginSettingsButton").IsVisible = connected && client?.ServerInfo["loginSettingsAvailable"]?.GetValue<bool>() == true;

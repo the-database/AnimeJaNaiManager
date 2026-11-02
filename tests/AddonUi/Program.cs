@@ -33,6 +33,7 @@ await session.Dispatch<bool>(async () =>
     // after the ordinary UI fixture has initialized them.
     if (focusedCase == "startup-close") { await UsabilityUiChecks.ClosingStartupAsync(output); return true; }
     if (focusedCase == "missing-runtime") { await UsabilityUiChecks.MissingRuntimeAsync(output); return true; }
+    if (focusedCase == "empty-installation") { await UsabilityUiChecks.EmptyInstallationAsync(output); return true; }
     if (args.Length == 2) return await RealHostChecks.RunAsync(output, Path.GetFullPath(args[1]));
     Application.Current!.RequestedThemeVariant = ThemeVariant.Dark;
     var view = new AddonsView();
@@ -51,8 +52,10 @@ await session.Dispatch<bool>(async () =>
 
     await Task.Delay(150);
     Check(server!.Connections == 0, "An unused Addons tab should not connect an empty installation");
+    string installed = Path.Combine(output, "data/addons/installed/org.example.fixture");
+    Directory.CreateDirectory(installed); File.WriteAllText(Path.Combine(installed, "active.json"), "{}");
     tabs.SelectedIndex = 1;
-    await Until(() => Find<Button>("InstallButton").IsEnabled);
+    await Until(() => Find<Button>("RefreshButton").IsEnabled);
     Check(view.FindControl<Button>("ConnectButton") is null && !Find<Button>("RetryButton").IsVisible, "Opening Addons must be automatic");
     Check(Find<TextBlock>("AddonTitle").Text == "Sample addon", "Addon was not loaded");
     Check(Find<StackPanel>("SettingFields").Children.Count == 4, "Missing typed settings controls");

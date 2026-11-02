@@ -20,6 +20,13 @@ internal static class UsabilityUiChecks
         T Find<T>(string name) where T : Control => view.FindControl<T>(name)!;
         void Click(string name) => Find<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check(AddonsView.ActionText(new JsonObject { ["message"] = "Hello 日本語" }) == "Hello 日本語" && AddonsView.ActionText(JsonValue.Create("Hello")) == "Hello", "Creator messages should be readable without JSON syntax");
+        EventHandler<WindowClosingEventArgs> veto = (_, args) => args.Cancel = true;
+        window.Closing += veto;
+        window.Close();
+        Check(window.IsVisible, "The later close handler did not cancel closing");
+        Click("StartButton"); await Until(() => server.Running && Find<Button>("RefreshButton").IsEnabled);
+        Click("StopButton"); await Until(() => !server.Running && Find<Button>("RefreshButton").IsEnabled);
+        window.Closing -= veto;
         async Task Choose(string choice)
         {
             await Until(() => window.OwnedWindows.Count == 1);
@@ -71,7 +78,7 @@ internal static class UsabilityUiChecks
         window.Close(); await Choose("Discard and close");
         Check(!window.IsVisible && server.Values["name"]!.GetValue<string>() == saved, "Discard and close unexpectedly saved settings or left the window open");
         File.WriteAllText(Path.Combine(output, "usability-results.json"), JsonSerializer.Serialize(new { passed = true, checks = new[] {
-            "unused tab stays idle", "opening tab connects automatically", "reopening tab reuses connection", "stopped action does not create temporary work",
+            "unused tab stays idle", "opening tab connects automatically", "reopening tab reuses connection", "stopped action does not create temporary work", "cancelled window close leaves addons usable",
             "unsaved selection protected", "reload cancellation preserves draft", "explicit discard restores settings", "removal cancellation",
             "actionable permission error", "technical details retained", "offline guides discoverable", "plain creator messages",
             "closing from another tab preserves draft on cancel", "explicit close discards draft without saving", "start preserves draft", "stop preserves draft",
@@ -82,15 +89,15 @@ internal static class UsabilityUiChecks
         string root = Path.Combine(output, "missing-runtime");
         Environment.SetEnvironmentVariable("ANIMEJANAI_ROOT", root);
         Environment.SetEnvironmentVariable("ANIMEJANAI_DATA_DIR", Path.Combine(root, "data"));
-        var view = new AddonsView(); var window = new Window { Content = view, Width = 1100, Height = 820 };
+        var window = new MainWindow(); var view = window.FindControl<AddonsView>("AddonPanel")!;
         window.Show();
         try
         {
-            await Until(() => view.FindControl<Button>("RetryButton")!.IsVisible);
-            Check(!view.FindControl<Button>("InstallButton")!.IsEnabled && view.FindControl<TextBlock>("Status")!.Text!.Contains("Extract the complete"), "Missing files should offer recovery and keep install unavailable");
+            await Task.Delay(100);
+            Check(!window.FindControl<TabItem>("AddonsTab")!.IsVisible, "A normal install must not show unsupported addon controls");
             Check(!File.Exists(Path.Combine(root, ".ajn-addon-activity.lock")), "Visiting a build without addon support created an installation lock");
             using (var frame = window.CaptureRenderedFrame()) frame!.Save(Path.Combine(output, "addon-missing-runtime.png"));
-            File.WriteAllText(Path.Combine(output, "missing-runtime-results.json"), "{\"passed\":true,\"checks\":[\"automatic startup failure\",\"missing file recovery\",\"retry offered without granting anything\"]}");
+            File.WriteAllText(Path.Combine(output, "missing-runtime-results.json"), "{\"passed\":true,\"checks\":[\"missing runtime hides tab\",\"no installation lock\"]}");
         }
         finally { await view.CloseAsync(); window.Close(); }
     }
@@ -103,6 +110,8 @@ internal static class UsabilityUiChecks
         File.WriteAllBytes(Path.Combine(root, "addon-host/runtime/wasmtime.exe"), []);
         Environment.SetEnvironmentVariable("ANIMEJANAI_ROOT", root);
         Environment.SetEnvironmentVariable("ANIMEJANAI_DATA_DIR", Path.Combine(root, "data"));
+        string installed = Path.Combine(root, "data/addons/installed/org.example.fixture");
+        Directory.CreateDirectory(installed); File.WriteAllText(Path.Combine(installed, "active.json"), "{}");
         using var server = new System.IO.Pipes.NamedPipeServerStream(AnimeJaNai.Addons.Management.ManagementClient.PipeName(Path.Combine(root, "data/addons")),
             System.IO.Pipes.PipeDirection.InOut, 1, System.IO.Pipes.PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
         var view = new AddonsView(); var window = new Window { Content = view };
@@ -120,5 +129,20 @@ internal static class UsabilityUiChecks
             File.WriteAllText(Path.Combine(output, "startup-close-results.json"), "{\"passed\":true,\"checks\":[\"unresponsive handshake cancelled on close\"]}");
         }
         finally { await view.CloseAsync(); window.Close(); }
+    }
+
+    internal static async Task EmptyInstallationAsync(string output)
+    {
+        var view = new AddonsView(); var window = new Window { Content = view };
+        view.ProtectUnsavedSettingsOnClose(window);
+        window.Show();
+        await view.ManagerOpenedAsync();
+        await Task.Delay(150);
+        Check(AddonsView.SupportInstalled && view.FindControl<Button>("InstallButton")!.IsEnabled, "Empty addon install must offer installation");
+        Check(!view.FindControl<Button>("RetryButton")!.IsVisible, "An unused host is not a connection error");
+        Check(!File.Exists(Path.Combine(output, ".ajn-addon-activity.lock")), "Empty addon tab started or locked the host");
+        Check(!Directory.Exists(Path.Combine(output, "data/addons")), "Empty addon tab created host data");
+        window.Close();
+        File.WriteAllText(Path.Combine(output, "empty-installation-results.json"), "{\"passed\":true}");
     }
 }
