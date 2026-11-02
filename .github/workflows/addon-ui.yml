@@ -34,9 +34,10 @@ jobs:
         with:
           repository: the-database/mpv-AnimeJaNai
           # Immutable pre-merge source from host PR 227, not merged main yet.
-          # Switch to the merged main commit when it lands. Releases only
-          # verify the in-tree snapshot and never need this checkout.
-          ref: 65d7fc761048cb070575173021bc578cc0477776
+          # Merge the host PR first, then pin its resulting main commit here
+          # before merging Manager (including after a squash/rebase merge).
+          # Releases verify the in-tree snapshot, without this checkout.
+          ref: 4a374f2421bf18a1b0263b06a4b28d9aab1414a2
           path: host-source
       - name: Prepare the matching packaged host
         shell: pwsh

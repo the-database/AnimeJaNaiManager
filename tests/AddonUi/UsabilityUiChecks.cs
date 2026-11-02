@@ -97,7 +97,23 @@ internal static class UsabilityUiChecks
             Check(!window.FindControl<TabItem>("AddonsTab")!.IsVisible, "A normal install must not show unsupported addon controls");
             Check(!File.Exists(Path.Combine(root, ".ajn-addon-activity.lock")), "Visiting a build without addon support created an installation lock");
             using (var frame = window.CaptureRenderedFrame()) frame!.Save(Path.Combine(output, "addon-missing-runtime.png"));
-            File.WriteAllText(Path.Combine(output, "missing-runtime-results.json"), "{\"passed\":true,\"checks\":[\"missing runtime hides tab\",\"no installation lock\"]}");
+            // Deliver the headless window's normal focus notification after
+            // support arrives, without constructing or reopening Manager.
+            Directory.CreateDirectory(Path.Combine(root, "addon-host/runtime"));
+            File.WriteAllBytes(Path.Combine(root, "addon-host/ajn-addon.exe"), []);
+            window.Activate();
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            Check(!window.FindControl<TabItem>("AddonsTab")!.IsVisible, "Incomplete support must keep the tab hidden");
+            File.WriteAllBytes(Path.Combine(root, "addon-host/runtime/wasmtime.exe"), []);
+            window.Activate();
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            var tab = window.FindControl<TabItem>("AddonsTab")!;
+            Check(tab.IsVisible, "Installing support while Manager is open must reveal the tab on focus");
+            tab.IsSelected = true;
+            await Task.Delay(100);
+            Check(view.FindControl<Button>("InstallButton")!.IsEnabled, "Newly installed support must offer addon installation");
+            Check(!File.Exists(Path.Combine(root, ".ajn-addon-activity.lock")), "Discovering empty support started or locked the host");
+            File.WriteAllText(Path.Combine(output, "missing-runtime-results.json"), "{\"passed\":true,\"checks\":[\"missing runtime hides tab\",\"partial install stays hidden\",\"focus discovers newly installed support\",\"installation enabled\",\"no installation lock\"]}");
         }
         finally { await view.CloseAsync(); window.Close(); }
     }
