@@ -113,6 +113,11 @@ internal static class UsabilityUiChecks
             await Task.Delay(100);
             Check(view.FindControl<Button>("InstallButton")!.IsEnabled, "Newly installed support must offer addon installation");
             Check(!File.Exists(Path.Combine(root, ".ajn-addon-activity.lock")), "Discovering empty support started or locked the host");
+            File.Delete(Path.Combine(root, "addon-host/runtime/wasmtime.exe"));
+            window.Activate();
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            Check(!tab.IsVisible && window.FindControl<TabControl>("MainTabs")!.SelectedIndex == 0,
+                "Removing support must select a visible page");
             File.WriteAllText(Path.Combine(output, "missing-runtime-results.json"), "{\"passed\":true,\"checks\":[\"missing runtime hides tab\",\"partial install stays hidden\",\"focus discovers newly installed support\",\"installation enabled\",\"no installation lock\"]}");
         }
         finally { await view.CloseAsync(); window.Close(); }

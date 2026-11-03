@@ -339,6 +339,13 @@ public partial class AddonsView : UserControl
         content.Children.Add(new TextBlock { Text = manifest["name"]!.GetValue<string>(), FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
         content.Children.Add(new TextBlock { Text = manifest["id"]!.GetValue<string>() + " · " + manifest["version"]!.GetValue<string>(), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(new TextBlock { Text = "Local development package. Publisher identity has not been verified.", TextWrapping = TextWrapping.Wrap });
+        ComboBox? storedData = null;
+        if (inspected["requiresStoredDataChoice"]?.GetValue<bool>() == true)
+        {
+            content.Children.Add(new TextBlock { Text = "A different package used this addon ID before. Saved settings and data may contain secrets. Only keep them if you trust this package with that information; resetting permanently deletes the old saved data.", TextWrapping = TextWrapping.Wrap });
+            storedData = new ComboBox { ItemsSource = new[] { "Choose what to do with saved data…", "Keep saved data — I trust this package", "Reset saved settings and data" }, SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+            content.Children.Add(storedData);
+        }
         content.Children.Add(new TextBlock { Text = "Choose the permissions to grant:", FontWeight = FontWeight.SemiBold });
         content.Children.Add(new TextBlock { Text = "Only selected permissions are allowed. Features that need an unchecked permission may not work. You can review your choices later by installing this package again.", TextWrapping = TextWrapping.Wrap });
         var grants = new List<(string Permission, CheckBox Check)>();
@@ -373,11 +380,15 @@ public partial class AddonsView : UserControl
                 HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled } };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Cancel", IsCancel = true }; cancel.Click += (_, _) => dialog.Close(false);
-        var install = new Button { Content = "Install" }; install.Click += (_, _) => dialog.Close(true);
+        var install = new Button { Content = "Install", IsEnabled = storedData is null };
+        if (storedData is not null) storedData.SelectionChanged += (_, _) => install.IsEnabled = storedData.SelectedIndex > 0;
+        install.Click += (_, _) => dialog.Close(true);
         buttons.Children.Add(cancel); buttons.Children.Add(install); content.Children.Add(buttons);
         if (!await dialog.ShowDialog<bool>(owner)) return;
         var approved = new JsonArray(grants.Where(g => g.Check.IsChecked == true).Select(g => (JsonNode?)JsonValue.Create(g.Permission)).ToArray());
-        await CallAsync("addons.installDev", new() { ["path"] = path, ["expectedHash"] = inspected["hash"]!.DeepClone(), ["permissions"] = approved });
+        var request = new JsonObject { ["path"] = path, ["expectedHash"] = inspected["hash"]!.DeepClone(), ["permissions"] = approved };
+        if (storedData is not null) request["keepStoredData"] = storedData.SelectedIndex == 1;
+        await CallAsync("addons.installDev", request);
         await RefreshListAsync(manifest["id"]!.GetValue<string>());
         Control<TextBlock>("Status").Text = "Addon installed. " + (selectedRunning ? "It is running." : Control<Button>("StartButton").Tag is true ? "Choose Start addon when you are ready to use it." : "It will start from its configured startup event.");
     }

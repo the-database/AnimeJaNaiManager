@@ -92,15 +92,22 @@ await session.Dispatch<bool>(async () =>
     await Until(() => Find<TextBlock>("ActionResult").Text?.Contains("action received") == true);
     Click("StopButton"); await Until(() => !server.Running && Find<Button>("RefreshButton").IsEnabled);
 
+    server.RequireStoredDataChoice = true;
     var review = view.ReviewPackageAsync("fixture.ajnaddon", window);
     await Until(() => window.OwnedWindows.Count > 0);
     var dialog = window.OwnedWindows.Single();
+    var installButton = dialog.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Install");
+    Check(!installButton.IsEnabled, "Existing private data must require an explicit choice");
+    dialog.GetVisualDescendants().OfType<ComboBox>().Single().SelectedIndex = 1;
+    Check(installButton.IsEnabled, "Choosing to keep data should enable installation");
     var permissions = dialog.GetVisualDescendants().OfType<CheckBox>().ToArray();
     Check(permissions.Length == 2 && permissions.All(p => p.IsChecked == false), "Permissions must start unchecked");
     permissions[0].IsChecked = true;
     using (var frame = dialog.CaptureRenderedFrame()) frame!.Save(Path.Combine(output, "addon-permissions.png"));
     dialog.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Install").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     await review;
+    Check(server.KeepStoredData == true, "The explicit private-data choice was not sent to the host");
+    server.RequireStoredDataChoice = false;
     Check(server.Granted.SequenceEqual(new[] { "storage.read" }), "Approval did not match selected permissions");
     Check(server.ReviewHash == new string('a', 64), "Install approval was not bound to the reviewed hash");
 
@@ -208,6 +215,8 @@ internal sealed class FixtureServer : IAsyncDisposable
     public int ActionCalls;
     public int Connections, RemoveCalls;
     public bool FailNextStart;
+    public bool RequireStoredDataChoice;
+    public bool? KeepStoredData;
     public JsonObject? ExtraAddon;
     private readonly CancellationTokenSource lifetime = new();
     private readonly Task serving;
@@ -262,7 +271,7 @@ internal sealed class FixtureServer : IAsyncDisposable
                     "addons.settings" => JsonNode.Parse("""{"definitions":{"enabled":{"type":"boolean","label":"Enabled"},"rate":{"type":"number","label":"Sample rate","description":"A sample numeric setting."},"mode":{"type":"choice","label":"Mode","choices":["normal","quiet"]},"name":{"type":"string","label":"Greeting","maxLength":100}},"actions":{"check":{"label":"Check status","description":"Run an addon action."}}} """),
                     "addons.logs" => new JsonArray("Sample addon connected.", "Settings and messages are isolated from player profiles."),
                     "addons.action" => new JsonObject { ["status"] = "action received" },
-                    "addons.inspect" => new JsonObject { ["manifest"] = new JsonObject { ["id"] = "org.example.ui", ["name"] = "Sample addon", ["version"] = "0.1.0", ["permissions"] = ReviewPermissions.DeepClone() }, ["hash"] = new string('a', 64) },
+                    "addons.inspect" => new JsonObject { ["requiresStoredDataChoice"] = RequireStoredDataChoice, ["manifest"] = new JsonObject { ["id"] = "org.example.ui", ["name"] = "Sample addon", ["version"] = "0.1.0", ["permissions"] = ReviewPermissions.DeepClone() }, ["hash"] = new string('a', 64) },
                     "media.selections" => new JsonObject { ["sources"] = Sources.DeepClone(), ["profiles"] = Profiles.DeepClone() },
                     "network.selections" => new JsonObject { ["destinations"] = Destinations.DeepClone() },
                     "network.inspectDestination" => new JsonObject { ["origin"] = parameters["origin"]!.DeepClone(), ["protocol"] = "http", ["addresses"] = new JsonArray("127.0.0.1"), ["reviewId"] = "review-one" },
@@ -298,6 +307,7 @@ internal sealed class FixtureServer : IAsyncDisposable
                 if (method == "addons.stop") Running = false;
                 if (method == "addons.installDev")
                 {
+                    KeepStoredData = parameters["keepStoredData"]?.GetValue<bool>();
                     Granted = ((JsonArray)parameters["permissions"]!).Select(v => v!.GetValue<string>()).ToArray();
                     ReviewHash = parameters["expectedHash"]!.GetValue<string>();
                 }

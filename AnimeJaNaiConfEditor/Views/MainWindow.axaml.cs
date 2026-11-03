@@ -40,7 +40,11 @@ namespace AnimeJaNaiConfEditor.Views
         private void RefreshAddonSupport()
         {
             if (this.FindControl<TabItem>("AddonsTab") is { } addonsTab)
+            {
                 addonsTab.IsVisible = AddonsView.SupportInstalled;
+                if (!addonsTab.IsVisible && addonsTab.IsSelected && this.FindControl<TabControl>("MainTabs") is { } tabs)
+                    tabs.SelectedIndex = 0;
+            }
         }
 
         private async void MainWindow_Opened(object? sender, EventArgs e)

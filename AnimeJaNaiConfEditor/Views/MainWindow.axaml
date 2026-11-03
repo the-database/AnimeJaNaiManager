@@ -181,7 +181,7 @@
     <vm:MainWindowViewModel/>
   </Design.DataContext>
 
-  <TabControl SelectedIndex="{Binding SelectedTabIndex}" Padding="10,4,10,10">
+  <TabControl x:Name="MainTabs" SelectedIndex="{Binding SelectedTabIndex}" Padding="10,4,10,10">
   <TabItem Header="Profiles">
   <Grid x:Name="ProfilesGrid" RowDefinitions="*">
     <Grid.ColumnDefinitions>
