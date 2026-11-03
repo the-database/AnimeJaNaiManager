@@ -37,7 +37,7 @@ jobs:
           # Merge the host PR first, then pin its resulting main commit here
           # before merging Manager (including after a squash/rebase merge).
           # Releases verify the in-tree snapshot, without this checkout.
-          ref: 536dc04fb1f04fe60f1a3c7652b56048b3be02d3
+          ref: 35a008c24b9cc972bc36be61b12ad9bd49a53da0
           path: host-source
       - name: Prepare the matching packaged host
         shell: pwsh
