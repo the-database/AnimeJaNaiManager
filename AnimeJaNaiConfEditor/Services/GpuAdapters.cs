@@ -4,14 +4,22 @@ using System.Runtime.InteropServices;
 
 namespace AnimeJaNaiConfEditor.Services
 {
-    // A GPU DirectML can upscale on. Integrated is null when Direct3D 12 couldn't tell.
-    public sealed record DxgiGpu(string Name, uint VendorId, bool? Integrated);
+    // A GPU DirectML can upscale on. PciSlot is "pci:<bus>:<device>.<function>" (hex, the form
+    // the player's --d3d11-adapter takes), or null when Windows doesn't report one. Integrated is
+    // null when Direct3D 12 couldn't tell.
+    public sealed record DxgiGpu(string Name, uint VendorId, string? PciSlot, bool? Integrated)
+    {
+        // What the choice saves: the PCI slot, which tells identical cards apart and stays the
+        // same across reboots, else the name.
+        public string Key => PciSlot ?? Name;
+    }
 
     // The GPUs for the DirectML GPU choice (Windows only): DXGI's hardware adapters in the order
     // Windows ranks them for high performance, which is the order the player's
-    // d3d11-adapter-preference=high-performance (DirectML's Auto) picks from. Each name is listed
-    // once, because mpv's --d3d11-adapter selects by name. Integrated graphics are told apart the
-    // way libaji does it, by Direct3D 12's UMA flag.
+    // d3d11-adapter-preference=high-performance (DirectML's Auto) picks from. Like libaji, it
+    // skips indirect-display adapters (virtual monitors, which DXGI lists as extra copies of the
+    // GPU that renders for them), reads each adapter's PCI slot through D3DKMT, and tells
+    // integrated graphics apart by Direct3D 12's UMA flag.
     //
     // COM calls go through the vtables directly (indices from the DXGI and D3D12 headers), so
     // nothing here needs the full interface declarations.
@@ -54,10 +62,14 @@ namespace AnimeJaNaiConfEditor.Services
                             }
                             try
                             {
-                                if (Describe(adapter) is (string name, uint vendor, bool software) &&
-                                    !software && name.Length > 0 && seen.Add(name))
+                                if (Describe(adapter) is (string name, uint vendor, bool software, long luid) &&
+                                    !software && name.Length > 0 && !IsIndirectDisplay(luid))
                                 {
-                                    gpus.Add(new DxgiGpu(name, vendor, IsIntegrated(adapter)));
+                                    var gpu = new DxgiGpu(name, vendor, PciSlot(luid), null);
+                                    if (seen.Add(gpu.Key))
+                                    {
+                                        gpus.Add(gpu with { Integrated = IsIntegrated(adapter) });
+                                    }
                                 }
                             }
                             finally
@@ -85,8 +97,9 @@ namespace AnimeJaNaiConfEditor.Services
             return gpus;
         }
 
-        // DXGI_ADAPTER_DESC1: Description (WCHAR[128]) at 0, VendorId at 256, Flags at 304.
-        private static (string, uint, bool)? Describe(IntPtr adapter)
+        // DXGI_ADAPTER_DESC1: Description (WCHAR[128]) at 0, VendorId at 256, AdapterLuid at 296,
+        // Flags at 304.
+        private static (string, uint, bool, long)? Describe(IntPtr adapter)
         {
             IntPtr desc = Marshal.AllocHGlobal(320);
             try
@@ -97,12 +110,79 @@ namespace AnimeJaNaiConfEditor.Services
                 }
                 string name = (Marshal.PtrToStringUni(desc, 128) ?? "").Split('\0')[0].Trim();
                 uint vendor = (uint)Marshal.ReadInt32(desc, 256);
+                long luid = Marshal.ReadInt64(desc, 296);
                 uint flags = (uint)Marshal.ReadInt32(desc, 304);
-                return (name, vendor, (flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0);
+                return (name, vendor, (flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0, luid);
             }
             finally
             {
                 Marshal.FreeHGlobal(desc);
+            }
+        }
+
+        // D3DKMTQueryAdapterInfo for the adapter with this LUID; false if anything fails.
+        private static bool KmtQuery(long luid, int type, IntPtr data, uint size)
+        {
+            try
+            {
+                var open = new D3DKMT_OPENADAPTERFROMLUID { AdapterLuid = luid };
+                if (D3DKMTOpenAdapterFromLuid(ref open) != 0)
+                {
+                    return false;
+                }
+                try
+                {
+                    var query = new D3DKMT_QUERYADAPTERINFO
+                    {
+                        hAdapter = open.hAdapter, Type = type, pPrivateDriverData = data, PrivateDriverDataSize = size,
+                    };
+                    return D3DKMTQueryAdapterInfo(ref query) == 0;
+                }
+                finally
+                {
+                    var close = new D3DKMT_CLOSEADAPTER { hAdapter = open.hAdapter };
+                    D3DKMTCloseAdapter(ref close);
+                }
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+            {
+                return false;
+            }
+        }
+
+        // KMTQAITYPE_ADAPTERADDRESS: bus, device, function.
+        private static string? PciSlot(long luid)
+        {
+            IntPtr data = Marshal.AllocHGlobal(12);
+            try
+            {
+                if (!KmtQuery(luid, KMTQAITYPE_ADAPTERADDRESS, data, 12))
+                {
+                    return null;
+                }
+                uint bus = (uint)Marshal.ReadInt32(data, 0);
+                uint device = (uint)Marshal.ReadInt32(data, 4);
+                uint function = (uint)Marshal.ReadInt32(data, 8);
+                return $"pci:{bus:x2}:{device:x2}.{function:x}";
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(data);
+            }
+        }
+
+        // KMTQAITYPE_ADAPTERTYPE's IndirectDisplayDevice bit: a virtual monitor's adapter.
+        private static bool IsIndirectDisplay(long luid)
+        {
+            IntPtr data = Marshal.AllocHGlobal(4);
+            try
+            {
+                return KmtQuery(luid, KMTQAITYPE_ADAPTERTYPE, data, 4) &&
+                       ((uint)Marshal.ReadInt32(data) & (1u << 6)) != 0;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(data);
             }
         }
 
@@ -152,6 +232,22 @@ namespace AnimeJaNaiConfEditor.Services
         private const uint DXGI_ADAPTER_FLAG_SOFTWARE = 2;
         private const int D3D_FEATURE_LEVEL_11_0 = 0xb000;
         private const int D3D12_FEATURE_ARCHITECTURE = 1;
+        private const int KMTQAITYPE_ADAPTERADDRESS = 6;
+        private const int KMTQAITYPE_ADAPTERTYPE = 15;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct D3DKMT_OPENADAPTERFROMLUID { public long AdapterLuid; public uint hAdapter; }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct D3DKMT_QUERYADAPTERINFO { public uint hAdapter; public int Type; public IntPtr pPrivateDriverData; public uint PrivateDriverDataSize; }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct D3DKMT_CLOSEADAPTER { public uint hAdapter; }
+
+        [DllImport("gdi32.dll")]
+        private static extern int D3DKMTOpenAdapterFromLuid(ref D3DKMT_OPENADAPTERFROMLUID open);
+        [DllImport("gdi32.dll")]
+        private static extern int D3DKMTQueryAdapterInfo(ref D3DKMT_QUERYADAPTERINFO query);
+        [DllImport("gdi32.dll")]
+        private static extern int D3DKMTCloseAdapter(ref D3DKMT_CLOSEADAPTER close);
 
         private static T Slot<T>(IntPtr obj, int index) where T : Delegate =>
             Marshal.GetDelegateForFunctionPointer<T>(Marshal.ReadIntPtr(Marshal.ReadIntPtr(obj), index * IntPtr.Size));

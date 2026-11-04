@@ -218,27 +218,30 @@ namespace AnimeJaNaiConfEditor.ViewModels
         private bool DirectMlChoice => AnimeJaNaiConf?.DirectMlSelected == true;
 
         // The GPUs the selected backend can upscale on. TensorRT: the NVIDIA GPUs, in NVML's
-        // order, keyed by device UUID (two of the same model are numbered). DirectML: every
-        // hardware adapter, keyed by name, in Windows' high-performance order with integrated
-        // graphics moved last.
+        // order, keyed by device UUID. DirectML: every hardware adapter, keyed by PCI slot (by
+        // name when Windows reports none), in Windows' high-performance order with integrated
+        // graphics moved last. Two of the same model are numbered.
         private List<GpuEntry> BackendGpus()
         {
             if (DirectMlChoice)
             {
-                return (_dxgiGpus ?? [])
-                    .Select(g => new GpuEntry(g.Name, g.Name, g.Integrated))
+                var dxgi = _dxgiGpus ?? [];
+                return dxgi
+                    .Select((g, i) => new GpuEntry(Numbered(dxgi.Select(o => o.Name).ToList(), i), g.Key, g.Integrated))
                     .OrderBy(g => g.Integrated == true)
                     .ToList();
             }
             var nvidia = ComponentManager.NvidiaGpus;
             return nvidia
-                .Select((g, i) => new GpuEntry(
-                    nvidia.Count(o => o.Name == g.Name) > 1
-                        ? $"{g.Name} ({nvidia.Take(i + 1).Count(o => o.Name == g.Name)})"
-                        : g.Name,
-                    g.Uuid, false))
+                .Select((g, i) => new GpuEntry(Numbered(nvidia.Select(o => o.Name).ToList(), i), g.Uuid, false))
                 .ToList();
         }
+
+        // names[i], numbered when another GPU has the same name: "X (1)", "X (2)"
+        private static string Numbered(List<string> names, int i) =>
+            names.Count(n => n == names[i]) > 1
+                ? $"{names[i]} ({names.Take(i + 1).Count(n => n == names[i])})"
+                : names[i];
 
         private string ChosenGpuKey
         {
@@ -276,7 +279,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
             if (DirectMlChoice)
             {
                 return _dxgiGpus is { Count: > 0 } all
-                    ? gpus.FirstOrDefault(g => g.Key == all[0].Name)
+                    ? gpus.FirstOrDefault(g => g.Key == all[0].Key)
                     : null;
             }
             return gpus.Count == 1 ? gpus[0] : null;
@@ -1931,7 +1934,8 @@ chain_2_rife=no";
         public Backend SelectedBackend => DirectMlSelected ? Backend.DirectML : Backend.TensorRT;
 
         // The GPU choice per backend, "" for Auto. [global] gpu_tensorrt is a Vulkan/CUDA device
-        // UUID and gpu_directml a D3D11 adapter name; scripts/animejanai_backend.lua applies the
+        // UUID and gpu_directml a D3D11 adapter's PCI slot (pci:bb:dd.f, or its name when Windows
+        // reports no slot); scripts/animejanai_backend.lua applies the
         // active backend's one as --vulkan-device / --d3d11-adapter. One per backend because
         // they name GPUs differently, and so switching backends keeps each choice.
         private string _gpuTensorRt = "";
