@@ -73,6 +73,11 @@ namespace AnimeJaNaiConfEditor.Services
         [JsonPropertyName("submitted_by")] public string SubmittedBy { get; set; } = "";
         [JsonPropertyName("note")] public string Note { get; set; } = "";
 
+        // The GPU the benchmark ran on, from its metadata line ("gpu", which the runner reads from
+        // the stats log's "GPU:" line; aji v0.22.0+). When set, it is the submission's GPU, and VRAM,
+        // power and driver come from that GPU, not from the likeliest-looking adapter on this PC.
+        [JsonIgnore] public string MeasuredGpu { get; set; } = "";
+
         static readonly JsonSerializerOptions PreviewOpts = new() { WriteIndented = true };
 
         public bool HasResults => Results.Values.Any(r => r.Count > 0);
@@ -106,9 +111,15 @@ namespace AnimeJaNaiConfEditor.Services
                 if (line.StartsWith(BenchmarkMeasurement.Header, StringComparison.Ordinal))
                 {
                     if (sub.Measurement != null) throw new InvalidDataException("Duplicate benchmark metadata.");
-                    sub.Measurement = JsonSerializer.Deserialize<BenchmarkMeasurement>(line[BenchmarkMeasurement.Header.Length..])
+                    var metadataJson = line[BenchmarkMeasurement.Header.Length..];
+                    sub.Measurement = JsonSerializer.Deserialize<BenchmarkMeasurement>(metadataJson)
                         ?? throw new InvalidDataException("Missing benchmark metadata.");
                     sub.Measurement.Validate();
+                    using (var metadata = JsonDocument.Parse(metadataJson))
+                    {
+                        if (metadata.RootElement.TryGetProperty("gpu", out var gpu) && gpu.ValueKind == JsonValueKind.String)
+                            sub.MeasuredGpu = gpu.GetString()!.Trim();
+                    }
                     sub.Schema = 2;
                     continue;
                 }
@@ -158,6 +169,8 @@ namespace AnimeJaNaiConfEditor.Services
             {
                 try { GatherFromProc(); } catch { /* /proc unavailable: leave blank */ }
             }
+            if (MeasuredGpu.Length > 0)
+                Gpu = MeasuredGpu;
             TryFillDxgiMemory();
             TryFillNvidia();
             TryFillKnownGpuSpecs();
@@ -196,7 +209,9 @@ namespace AnimeJaNaiConfEditor.Services
                         continue;
                     if (!long.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var vram))
                         continue;
-                    if (vram <= bestVram) continue;
+                    if (MeasuredGpu.Length > 0 ? !GpuNameMatches(parts[0].Trim(), MeasuredGpu) || bestName.Length > 0
+                                               : vram <= bestVram)
+                        continue;
                     bestName = parts[0].Trim();
                     bestVram = vram;
                     bestPower = parts.Length >= 3 &&
@@ -207,9 +222,10 @@ namespace AnimeJaNaiConfEditor.Services
                 var hadNoGpu = Gpu.Length == 0;
                 var hadIntegratedGpu = IsIntegratedGpuName(Gpu);
                 var hadNonNvidiaGpu = Gpu.Length > 0 && !IsNvidiaGpuName(Gpu);
-                var shouldReplaceWithNvidia = Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase) ||
-                                              hadNoGpu ||
-                                              hadIntegratedGpu;
+                var shouldReplaceWithNvidia = MeasuredGpu.Length == 0 &&
+                                              (Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase) ||
+                                               hadNoGpu ||
+                                               hadIntegratedGpu);
                 if (bestName.Length > 0 && shouldReplaceWithNvidia)
                     Gpu = bestName;
                 if (bestVram > 0) VramMb = bestVram;
@@ -230,16 +246,17 @@ namespace AnimeJaNaiConfEditor.Services
                 var tensorRt = Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase);
                 var selected = adapters
                     .Where(a => a.DedicatedVideoMemory > 0 && !a.Software)
+                    .Where(a => MeasuredGpu.Length == 0 || GpuNameMatches(a.Name, MeasuredGpu))
                     .OrderByDescending(a => DxgiAdapterScore(a, tensorRt))
                     .ThenByDescending(a => a.DedicatedVideoMemory)
                     .FirstOrDefault();
 
-                if (selected.Name.Length == 0 || selected.DedicatedVideoMemory <= 0)
+                if (selected.Name == null || selected.Name.Length == 0 || selected.DedicatedVideoMemory <= 0)
                     return;
 
-                if (Gpu.Length == 0 ||
+                if (MeasuredGpu.Length == 0 && (Gpu.Length == 0 ||
                     IsIntegratedGpuName(Gpu) ||
-                    (tensorRt && IsNvidiaGpuName(selected.Name)))
+                    (tensorRt && IsNvidiaGpuName(selected.Name))))
                     Gpu = selected.Name;
 
                 VramMb = (long)Math.Round(selected.DedicatedVideoMemory / 1048576.0);
@@ -262,7 +279,9 @@ namespace AnimeJaNaiConfEditor.Services
                 // WMI order is not stable: Ryzen systems often list
                 // "AMD Radeon(TM) Graphics" before the NVIDIA dGPU.
                 var tensorRt = Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase);
-                var pick = tensorRt
+                var pick = MeasuredGpu.Length > 0
+                    ? gpus.FirstOrDefault(g => GpuNameMatches(g.name, MeasuredGpu))
+                    : tensorRt
                     ? gpus.FirstOrDefault(g => IsNvidiaGpuName(g.name))
                     : gpus.OrderByDescending(g => GpuPriority(g.name)).FirstOrDefault();
                 if (pick.name == null || pick.name.Length == 0) pick = gpus.FirstOrDefault();

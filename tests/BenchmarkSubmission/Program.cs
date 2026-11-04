@@ -24,6 +24,14 @@ try
             "Keep the measured screen, independently of the machine submitting the file.");
         Check(sub.Measurement!.Description.Contains(resolution), "Show output resolution in the submission preview.");
     }
+    // The runner's measured GPU (aji v0.22.0+) is read, and isn't sent as part of the measurement.
+    File.WriteAllText(file, title + header("""{"method":"mpv-output-trace-v2","mode":"native-display","output_resolution":"3840x2160","display_hz":160,"gpu":"AMD Radeon RX 7600S"}""") + table);
+    var measured = BenchmarkSubmission.FromBenchmarkFile(file);
+    Check(measured.MeasuredGpu == "AMD Radeon RX 7600S", "Read the measured GPU from the metadata.");
+    using (var preview = JsonDocument.Parse(measured.ToPreviewJson()))
+        Check(!preview.RootElement.GetProperty("measurement").TryGetProperty("gpu", out _), "Keep the measurement shape the proxy validates.");
+    File.WriteAllText(file, title + header("""{"method":"mpv-output-trace-v2","mode":"pipeline"}""") + table);
+    Check(BenchmarkSubmission.FromBenchmarkFile(file).MeasuredGpu == "", "No measured GPU from older runners.");
     File.WriteAllText(file, title + header("""{"method":"mpv-output-trace-v2","mode":"pipeline"}""") + table);
     var pipeline = BenchmarkSubmission.FromBenchmarkFile(file);
     Check(pipeline.Measurement!.OutputResolution == null && pipeline.Schema == 2, "Pipeline has no display target.");
