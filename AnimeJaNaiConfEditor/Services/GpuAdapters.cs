@@ -163,7 +163,8 @@ namespace AnimeJaNaiConfEditor.Services
                 uint bus = (uint)Marshal.ReadInt32(data, 0);
                 uint device = (uint)Marshal.ReadInt32(data, 4);
                 uint function = (uint)Marshal.ReadInt32(data, 8);
-                return $"pci:{bus:x2}:{device:x2}.{function:x}";
+                // all ones: an adapter that isn't on PCI (the player treats it the same way)
+                return bus == uint.MaxValue ? null : $"pci:{bus:x2}:{device:x2}.{function:x}";
             }
             finally
             {
