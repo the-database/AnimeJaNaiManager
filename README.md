@@ -1,6 +1,6 @@
 # AnimeJaNai Manager
 
-Manager for [mpv-upscale-2x_animejanai](https://github.com/the-database/mpv-upscale-2x_animejanai): edit upscaling profiles and chains, and install or remove hardware-specific components (TensorRT runtime, per-GPU kernel packs, RIFE interpolation models) with recommendations based on the detected GPU.
+Manager for [mpv-AnimeJaNai](https://github.com/the-database/mpv-AnimeJaNai): edit upscaling profiles and chains, and install or remove hardware-specific components (TensorRT runtime, per-GPU kernel packs, RIFE interpolation models) with recommendations based on the detected GPU.
 
 Formerly AnimeJaNaiConfEditor; the executable is `AnimeJaNaiManager.exe` and ships at the install root next to `mpvnet.exe`.
 
@@ -27,3 +27,8 @@ support and the updated `animejanai_backend.lua`. It is saved as
 in full config exports. It does not change the video frame rate or enable RIFE.
 
 ![297521638-76a8db5b-8c67-4b0c-911a-9b02598fb37a](https://github.com/the-database/AnimeJaNaiConfEditor/assets/25811902/e3b5d268-794c-40d3-b0ae-2d781d98d6ae)
+
+## Related projects
+The Manager ships with [mpv-AnimeJaNai](https://github.com/the-database/mpv-AnimeJaNai), which is
+part of the JaNai suite: see [animejan.ai](https://animejan.ai) for an overview of all the apps.
+Benchmarks run from the Manager are collected at [benchmarks.animejan.ai](https://benchmarks.animejan.ai).
