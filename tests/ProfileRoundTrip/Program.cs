@@ -25,6 +25,30 @@ try
             throw new Exception($"Autosave lost automatic display refresh={enabled}");
         Console.WriteLine($"PASS automatic display refresh={enabled} export/reload and autosave");
     }
+    // GPU choice: gpu_tensorrt / gpu_directml, written only when a GPU is chosen.
+    {
+        string Text(string conf) => File.ReadAllText(conf).Replace("\r", "");
+        string auto = Path.Combine(data, "gpu-auto.conf");
+        vm.WriteAnimeJaNaiConf(auto);
+        if (Text(auto).Contains("gpu_"))
+            throw new Exception("Auto must not write gpu_ keys");
+        vm.AnimeJaNaiConf.GpuTensorRt = "5a57ccea-430c-db57-6b2e-a4e89f017fe0";
+        vm.AnimeJaNaiConf.GpuDirectMl = "Intel(R) UHD Graphics 770";
+        string chosen = Path.Combine(data, "gpu-chosen.conf");
+        vm.WriteAnimeJaNaiConf(chosen);
+        var reread = vm.ReadAnimeJaNaiConf(chosen);
+        if (reread.GpuTensorRt != "5a57ccea-430c-db57-6b2e-a4e89f017fe0" || reread.GpuDirectMl != "Intel(R) UHD Graphics 770" ||
+            !Text(chosen).Contains("gpu_directml=Intel(R) UHD Graphics 770\n"))
+            throw new Exception($"Full config lost the GPU choice:\n{Text(chosen)}");
+        vm.AnimeJaNaiConf.GpuTensorRt = "";
+        vm.AnimeJaNaiConf.GpuDirectMl = "";
+        string autoAgain = Path.Combine(data, "gpu-auto-again.conf");
+        vm.WriteAnimeJaNaiConf(autoAgain);
+        if (Text(autoAgain) != Text(auto))
+            throw new Exception("Going back to Auto must restore the original config");
+        Console.WriteLine("PASS GPU choice round-trips, Auto writes nothing");
+    }
+
     foreach (bool ensemble in new[] { true, false })
     {
         vm.CurrentSlot.Chains[0].RifeEnsemble = ensemble;

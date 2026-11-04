@@ -320,8 +320,18 @@
               <ToggleButton IsChecked="{Binding AnimeJaNaiConf.DirectMlSelected}" Content="DirectML" Command="{Binding AnimeJaNaiConf.UserSelectDirectMl}" IsVisible="{Binding DirectMlAvailable}" />
             </StackPanel>
 
+            <StackPanel Classes="row" IsVisible="{Binding GpuChoiceVisible}">
+              <ContentControl Classes="hint" Content="GPU">
+                <ToolTip.Tip>
+                  <TextBlock TextWrapping="Wrap">The GPU that upscales and shows the video. Auto picks the graphics card: on TensorRT, the GPU the player renders on; on DirectML, the GPU Windows ranks for high performance. Choose one when this PC has more than one GPU and Auto picks the wrong one. Integrated graphics are listed last and upscale much slower than a graphics card. A GPU set in mpv.conf (<Run FontFamily="Consolas">vulkan-device</Run> or <Run FontFamily="Consolas">d3d11-adapter</Run>) takes precedence.</TextBlock>
+                </ToolTip.Tip>
+              </ContentControl>
+              <ui:FAComboBox MinWidth="260" ItemsSource="{Binding GpuChoices}" SelectedIndex="{Binding SelectedGpuChoiceIndex, Mode=TwoWay}" IsEnabled="{Binding GpuChoiceEnabled}" />
+            </StackPanel>
+            <TextBlock TextWrapping="Wrap" Foreground="Orange" IsVisible="{Binding GpuChoiceIntegratedWarning}" Text="Integrated graphics upscale much slower than your graphics card. Choose Auto unless you mean to use them." />
+
             <TextBlock TextWrapping="Wrap" Foreground="Orange" IsVisible="{Binding HasBackendNotice}" Text="{Binding BackendNotice}" />
-            <TextBlock Classes="note">Switching the backend takes effect after you restart the player.</TextBlock>
+            <TextBlock Classes="note">Switching the backend or GPU takes effect after you restart the player.</TextBlock>
 
             <Expander Classes="section" IsVisible="{Binding AnimeJaNaiConf.TensorRtSelected}" IsExpanded="{Binding TrtSectionExpanded}">
               <Expander.Header>

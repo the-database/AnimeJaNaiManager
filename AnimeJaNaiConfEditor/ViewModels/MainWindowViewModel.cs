@@ -45,6 +45,8 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
             RefreshComponentAwareness();
             ComponentManager.Refreshed += RefreshComponentAwareness;
+            this.WhenAnyValue(x => x.AnimeJaNaiConf.DirectMlSelected).Subscribe(_ => RaiseGpuChoice());
+            _ = LoadDxgiGpusAsync();
             _ = InitializeComponentManagerAsync();
         }
 
@@ -189,6 +191,194 @@ namespace AnimeJaNaiConfEditor.ViewModels
                     chain.RaisePropertyChanged(nameof(UpscaleChain.TemporalFixToggleEnabled));
                 }
             }
+
+            // the NVIDIA GPU list arrives with a component refresh
+            RaiseGpuChoice();
+        }
+
+        // ---- GPU choice -------------------------------------------------------------------
+        // Which GPU upscales, per backend (AnimeJaNaiConf.GpuTensorRt / GpuDirectMl). The same
+        // safeguards as VideoJaNai: graphics cards first, integrated graphics labelled and last,
+        // a warning when one is chosen over a graphics card, and no claim about which card is
+        // fastest. The row is always there when the backend has a GPU, so the settings say which
+        // GPU upscales; it can only be changed with more than one.
+
+        // DXGI's adapters, enumerated once in the background (Direct3D 12 device creation per
+        // adapter takes a moment); null until then.
+        private List<DxgiGpu>? _dxgiGpus;
+
+        private async Task LoadDxgiGpusAsync()
+        {
+            _dxgiGpus = await Task.Run(GpuAdapters.Enumerate);
+            RaiseGpuChoice();
+        }
+
+        private sealed record GpuEntry(string Label, string Key, bool? Integrated);
+
+        private bool DirectMlChoice => AnimeJaNaiConf?.DirectMlSelected == true;
+
+        // The GPUs the selected backend can upscale on. TensorRT: the NVIDIA GPUs, in NVML's
+        // order, keyed by device UUID (two of the same model are numbered). DirectML: every
+        // hardware adapter, keyed by name, in Windows' high-performance order with integrated
+        // graphics moved last.
+        private List<GpuEntry> BackendGpus()
+        {
+            if (DirectMlChoice)
+            {
+                return (_dxgiGpus ?? [])
+                    .Select(g => new GpuEntry(g.Name, g.Name, g.Integrated))
+                    .OrderBy(g => g.Integrated == true)
+                    .ToList();
+            }
+            var nvidia = ComponentManager.NvidiaGpus;
+            return nvidia
+                .Select((g, i) => new GpuEntry(
+                    nvidia.Count(o => o.Name == g.Name) > 1
+                        ? $"{g.Name} ({nvidia.Take(i + 1).Count(o => o.Name == g.Name)})"
+                        : g.Name,
+                    g.Uuid, false))
+                .ToList();
+        }
+
+        private string ChosenGpuKey
+        {
+            get => (DirectMlChoice ? AnimeJaNaiConf?.GpuDirectMl : AnimeJaNaiConf?.GpuTensorRt) ?? "";
+            set
+            {
+                if (AnimeJaNaiConf == null)
+                {
+                    return;
+                }
+                if (DirectMlChoice)
+                {
+                    AnimeJaNaiConf.GpuDirectMl = value;
+                }
+                else
+                {
+                    AnimeJaNaiConf.GpuTensorRt = value;
+                }
+            }
+        }
+
+        // The chosen GPU when this PC has it, else null (Auto, or a GPU no longer here: the
+        // player then uses its default GPU too).
+        private GpuEntry? ChosenGpu(List<GpuEntry> gpus)
+        {
+            var key = ChosenGpuKey;
+            return key.Length == 0 ? null
+                : gpus.FirstOrDefault(g => string.Equals(g.Key, key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // The GPU Auto means, where that's known: on DirectML the GPU Windows ranks first for high
+        // performance (the player's d3d11-adapter-preference), on TensorRT the only NVIDIA GPU.
+        private GpuEntry? AutoGpu(List<GpuEntry> gpus)
+        {
+            if (DirectMlChoice)
+            {
+                return _dxgiGpus is { Count: > 0 } all
+                    ? gpus.FirstOrDefault(g => g.Key == all[0].Name)
+                    : null;
+            }
+            return gpus.Count == 1 ? gpus[0] : null;
+        }
+
+        public bool GpuChoiceVisible => BackendGpus().Count > 0;
+        public bool GpuChoiceEnabled => BackendGpus().Count > 1;
+
+        public bool GpuChoiceIntegratedWarning
+        {
+            get
+            {
+                var gpus = BackendGpus();
+                return ChosenGpu(gpus)?.Integrated == true && gpus.Any(g => g.Integrated == false);
+            }
+        }
+
+        // Auto, then each GPU. The same array while the labels are the same: the list clears its
+        // selection when its items are replaced, and would write that back.
+        private string[] _gpuChoices = [];
+        public string[] GpuChoices
+        {
+            get
+            {
+                var gpus = BackendGpus();
+                string auto = AutoGpu(gpus) is GpuEntry a ? $"Auto ({a.Label})" : "Auto";
+                string[] choices = [auto, .. gpus.Select(g => g.Integrated == true ? $"{g.Label} (integrated)" : g.Label)];
+                if (!choices.SequenceEqual(_gpuChoices))
+                {
+                    _gpuChoices = choices;
+                }
+                return _gpuChoices;
+            }
+        }
+
+        // True while SelectedGpuChoiceIndex reports -1 to put the list's selection back.
+        private bool _gpuChoiceResync;
+
+        // True while RaiseGpuChoice replaces the list's items: the list then writes back an index
+        // of its own (e.g. 0 after a backend change), which isn't the user's choice.
+        private bool _gpuChoiceRaising;
+
+        public int SelectedGpuChoiceIndex
+        {
+            get
+            {
+                if (_gpuChoiceResync)
+                {
+                    return -1;
+                }
+                var gpus = BackendGpus();
+                return ChosenGpu(gpus) is GpuEntry g ? gpus.IndexOf(g) + 1 : 0;
+            }
+            set
+            {
+                // The list clears its selection (-1) when its items are replaced (a GPU list
+                // arriving, a backend change). Raising the same index again doesn't restore it, so
+                // once the list has settled report -1 and then the index.
+                if (value < 0 || _gpuChoiceRaising)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        _gpuChoiceResync = true;
+                        this.RaisePropertyChanged(nameof(SelectedGpuChoiceIndex));
+                        _gpuChoiceResync = false;
+                        this.RaisePropertyChanged(nameof(SelectedGpuChoiceIndex));
+                    });
+                    return;
+                }
+                var gpus = BackendGpus();
+                if (value == 0)
+                {
+                    // Auto clears the choice, unless the list just shows Auto because the chosen
+                    // GPU isn't (or isn't yet) in it
+                    if (ChosenGpu(gpus) != null)
+                    {
+                        ChosenGpuKey = "";
+                    }
+                }
+                else if (value <= gpus.Count)
+                {
+                    ChosenGpuKey = gpus[value - 1].Key;
+                }
+                this.RaisePropertyChanged(nameof(GpuChoiceIntegratedWarning));
+            }
+        }
+
+        private void RaiseGpuChoice()
+        {
+            _gpuChoiceRaising = true;
+            try
+            {
+                this.RaisePropertyChanged(nameof(GpuChoices));
+                this.RaisePropertyChanged(nameof(SelectedGpuChoiceIndex));
+            }
+            finally
+            {
+                _gpuChoiceRaising = false;
+            }
+            this.RaisePropertyChanged(nameof(GpuChoiceVisible));
+            this.RaisePropertyChanged(nameof(GpuChoiceEnabled));
+            this.RaisePropertyChanged(nameof(GpuChoiceIntegratedWarning));
         }
 
         public ComponentManagerViewModel ComponentManager { get; } = new();
@@ -848,6 +1038,9 @@ chain_2_rife=no";
                 parser.GetValue("global", "sub_render_mode", "").Trim(),
                 StringComparison.OrdinalIgnoreCase);
 
+            animeJaNaiConf.GpuTensorRt = parser.GetValue("global", "gpu_tensorrt", "").Trim();
+            animeJaNaiConf.GpuDirectMl = parser.GetValue("global", "gpu_directml", "").Trim();
+
             // config_version drives migrations (absent => 1, the pre-versioning schema).
             int.TryParse(parser.GetValue("global", "config_version", "1"), out var configVersion);
             var trtEngineSettings = parser.GetValue("global", "trt_engine_settings", "");
@@ -1159,6 +1352,15 @@ chain_2_rife=no";
             {
                 parser.SetValue("global", "display_rate_match", "yes");
             }
+            // Write-minimal: only a chosen GPU (absent => Auto).
+            if (!string.IsNullOrWhiteSpace(conf.GpuTensorRt))
+            {
+                parser.SetValue("global", "gpu_tensorrt", conf.GpuTensorRt.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(conf.GpuDirectMl))
+            {
+                parser.SetValue("global", "gpu_directml", conf.GpuDirectMl.Trim());
+            }
             // Write-minimal: only persist trt_engine_settings when it differs from the current
             // default, so future default changes apply automatically to users who didn't customize.
             if (conf.TrtEngineSettings != DEFAULT_TRT_ENGINE_SETTINGS)
@@ -1443,6 +1645,13 @@ chain_2_rife=no";
                         Vm?.WriteAnimeJaNaiConf();
                     });
 
+                this.WhenAnyValue(
+                    x => x.GpuTensorRt,
+                    x => x.GpuDirectMl).Subscribe(x =>
+                    {
+                        Vm?.WriteAnimeJaNaiConf();
+                    });
+
             }
         }
 
@@ -1720,6 +1929,26 @@ chain_2_rife=no";
         }
 
         public Backend SelectedBackend => DirectMlSelected ? Backend.DirectML : Backend.TensorRT;
+
+        // The GPU choice per backend, "" for Auto. [global] gpu_tensorrt is a Vulkan/CUDA device
+        // UUID and gpu_directml a D3D11 adapter name; scripts/animejanai_backend.lua applies the
+        // active backend's one as --vulkan-device / --d3d11-adapter. One per backend because
+        // they name GPUs differently, and so switching backends keeps each choice.
+        private string _gpuTensorRt = "";
+        [DataMember]
+        public string GpuTensorRt
+        {
+            get => _gpuTensorRt;
+            set => this.RaiseAndSetIfChanged(ref _gpuTensorRt, value);
+        }
+
+        private string _gpuDirectMl = "";
+        [DataMember]
+        public string GpuDirectMl
+        {
+            get => _gpuDirectMl;
+            set => this.RaiseAndSetIfChanged(ref _gpuDirectMl, value);
+        }
 
         private bool _autoDisplayRefresh;
         [DataMember]
