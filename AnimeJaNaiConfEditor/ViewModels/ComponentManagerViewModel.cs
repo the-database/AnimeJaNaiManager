@@ -83,6 +83,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         public bool TrtPackAvailable { get; private set; }
 
+        // Each NVIDIA GPU (name, Vulkan/CUDA device UUID), in NVML's order, for the TensorRT GPU
+        // choice. Empty until a refresh completes, without an NVIDIA GPU, and with an updater from
+        // before the list.
+        public IReadOnlyList<(string Name, string Uuid)> NvidiaGpus { get; private set; } = [];
+
         // Raised on the UI thread after every refresh (including after Apply),
         // so the Profiles tab can re-derive its component awareness.
         public event Action? Refreshed;
@@ -157,6 +162,13 @@ namespace AnimeJaNaiConfEditor.ViewModels
                     ? $"GPU: {gpu.GetProperty("name").GetString()}"
                     : "GPU: no NVIDIA device detected — the built-in DirectML engine covers AMD and Intel GPUs";
                 GpuNvidia = nvidia;
+                NvidiaGpus = root.TryGetProperty("gpus", out var gpus) && gpus.ValueKind == JsonValueKind.Array
+                    ? gpus.EnumerateArray()
+                        .Select(g => (Name: g.GetProperty("name").GetString() ?? "",
+                                      Uuid: g.GetProperty("uuid").GetString() ?? ""))
+                        .Where(g => g.Name.Length > 0 && g.Uuid.Length > 0)
+                        .ToList()
+                    : [];
 
                 Packs.Clear();
                 foreach (var e in root.GetProperty("packs").EnumerateArray())
