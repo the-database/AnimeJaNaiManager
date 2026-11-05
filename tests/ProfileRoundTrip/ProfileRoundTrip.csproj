@@ -10,7 +10,7 @@
     <Compile Include="../../AnimeJaNaiConfEditor/Services/OnnxInputShape.cs" Link="Production/OnnxInputShape.cs" />
     <Compile Include="../../AnimeJaNaiConfEditor/Services/UiState.cs" Link="Production/UiState.cs" />
     <Compile Include="../../AnimeJaNaiConfEditor/Services/GpuAdapters.cs" Link="Production/GpuAdapters.cs" />
-    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia" Version="12.1.5" />
     <PackageReference Include="FluentAvaloniaUI" Version="3.1.0" />
     <PackageReference Include="ReactiveUI.Avalonia" Version="12.1.6" />
     <PackageReference Include="Salaros.ConfigParser" Version="0.3.8" />
