@@ -1,0 +1,21 @@
+# Dependabot: monthly, grouped, to keep the noise down.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories: ["/", "/tests/*"]
+    schedule:
+      interval: monthly
+    groups:
+      # Avalonia and the libraries built on it move together.
+      avalonia:
+        patterns: ["*Avalonia*"]
+      nuget:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
