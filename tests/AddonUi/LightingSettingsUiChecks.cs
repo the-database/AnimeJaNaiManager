@@ -7,9 +7,20 @@ using System.Text.Json.Nodes;
 
 internal static class LightingSettingsUiChecks
 {
-    public static async Task RunAsync(AddonsView view, Window window, FixtureServer server, string output, string manifestPath)
+    public static async Task RunAsync(AddonsView view, Window window, FixtureServer server, string output, string? manifestPath)
     {
-        var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))!.AsObject();
+        // Run the grouped-settings regression in ordinary CI too. A real addon
+        // manifest can still be supplied for its complete settings-page check.
+        var manifest = JsonNode.Parse(manifestPath is not null ? File.ReadAllText(manifestPath) : """
+            {"settings":{
+                "device":{"type":"string","label":"Device address","description":"Choose a device.",
+                    "default":"","group":"Connection"},
+                "brightness":{"type":"number","label":"Brightness","description":"Raise for brighter output.",
+                    "default":0.5,"minimum":0,"maximum":1,"group":"Brightness and color"},
+                "gamma":{"type":"number","label":"Gamma","description":"Match the device gamma.",
+                    "default":2.2,"minimum":1,"maximum":3,"group":"Advanced","advanced":true}},
+             "actions":{"status":{"label":"Status","description":"Show the current device status."}}}
+            """)!.AsObject();
         var definitions = manifest["settings"]!.AsObject();
         server.SettingsManifest = manifest;
         server.Values.Clear();
@@ -24,8 +35,14 @@ internal static class LightingSettingsUiChecks
         Find<Button>("RefreshButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         await Until(() => Find<Button>("RefreshButton").IsEnabled);
         var groups = Find<StackPanel>("SettingFields").Children.OfType<Expander>().ToArray();
-        Check(groups.Select(g => (string)g.Header!).SequenceEqual(new[] { "Connection", "Brightness and color", "Transitions", "Background detection", "Advanced" }), "Lighting groups missing or out of order");
-        Check(groups.Take(4).All(g => g.IsExpanded) && !groups[4].IsExpanded, "Advanced settings should start collapsed");
+        var expectedGroups = definitions.Select(d => d.Value!["group"]!.GetValue<string>()).Distinct().ToArray();
+        Check(groups.Select(g => (string)g.Header!).SequenceEqual(expectedGroups), "Lighting groups missing or out of order");
+        foreach (var group in groups)
+        {
+            bool allAdvanced = definitions.Where(d => d.Value!["group"]!.GetValue<string>() == (string)group.Header!)
+                .All(d => d.Value!["advanced"]?.GetValue<bool>() == true);
+            Check(group.IsExpanded != allAdvanced, "Only all-advanced groups should start collapsed");
+        }
         TextBox? brightness = null;
         foreach (var (key, definition) in definitions)
         {

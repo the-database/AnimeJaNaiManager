@@ -182,8 +182,8 @@ await session.Dispatch<bool>(async () =>
     Check(mediaDraft.Text == "Pending media setup" && Find<StackPanel>("SettingFields").GetVisualDescendants().Contains(mediaDraft), "Removing media access lost unsaved settings");
     mediaDraft.Text = beforeMedia;
     await NetworkUiChecks.RunAsync(view, window, server, output);
-    if (Environment.GetEnvironmentVariable("AJN_LIGHTING_MANIFEST") is string lightingManifest)
-        await LightingSettingsUiChecks.RunAsync(view, window, server, output, lightingManifest);
+    await LightingSettingsUiChecks.RunAsync(view, window, server, output,
+        Environment.GetEnvironmentVariable("AJN_LIGHTING_MANIFEST"));
     await ListenerUiChecks.RunAsync(view, window, server, output);
     await UsabilityUiChecks.RunAsync(view, window, server, output);
     await view.CloseAsync(); window.Close();
