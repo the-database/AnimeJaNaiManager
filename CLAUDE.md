@@ -87,7 +87,9 @@ ship in this artifact. `dotnet publish` is invoked directly rather than through
 `release_version` on a real release.
 
 After publishing, bump **`ManagerVersion`** in `BuildMpvUpscale2xAnimeJaNai/Program.cs` in
-`the-database/mpv-AnimeJaNai` — that constant is what pulls this build into the package. The
+`the-database/mpv-AnimeJaNai` — that constant is what pulls this build into the package. A
+dispatched release does it for you: its last job (`notify-downstream.yml`, needs the
+`JANAI_BUMP_TOKEN` secret) has mpv-AnimeJaNai open the bump PR. The
 release runbook for the whole project is that repo's `docs/RELEASE.md`.
 
 `setup-dotnet` pins `dotnet-version: '10.x'`, which must match `<TargetFramework>net10.0</TargetFramework>`.

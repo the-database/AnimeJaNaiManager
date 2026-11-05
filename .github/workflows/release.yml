@@ -104,3 +104,13 @@ jobs:
         allowUpdates: true
         artifacts: AnimeJaNaiManager-portable-linux-x64.tar.zst
         token: ${{ secrets.GITHUB_TOKEN }}
+
+  # mpv-AnimeJaNai opens a PR that pins ManagerVersion to this release (its bump-pins.yml).
+  # Dispatched releases only: a push to linux-support re-uploads to DEFAULT_TAG.
+  notify-downstream:
+    needs: [release, release-linux]
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/notify-downstream.yml
+    with:
+      tag: ${{ github.event.inputs.release_version }}
+    secrets: inherit
