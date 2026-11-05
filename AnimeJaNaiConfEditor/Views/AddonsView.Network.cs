@@ -134,6 +134,28 @@ public partial class AddonsView
         finally { value.Text = ""; }
     }
 
+    internal async Task<string?> ConnectDeviceAsync(Window owner, string id, string hash, string setting, string label, string host)
+    {
+        var reviewed = (JsonObject)(await CallAsync("network.inspectDevice", new() { ["id"] = id, ["expectedHash"] = hash,
+            ["setting"] = setting, ["host"] = host }))!;
+        var content = NetworkPanel("Connect " + label + "?", id);
+        content.Children.Add(new TextBlock { Text = reviewed["host"]!.GetValue<string>(), FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
+        var destinations = (JsonArray)reviewed["destinations"]!;
+        content.Children.Add(new TextBlock { Text = "Allow this addon to control the device using these services:", TextWrapping = TextWrapping.Wrap });
+        foreach (var destination in destinations)
+            content.Children.Add(new TextBlock { Text = destination!["origin"]!.GetValue<string>(), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = "HTTP services allow reading and changing any path on the device. UDP services allow sending datagrams to the listed ports. HTTP traffic is unencrypted.", TextWrapping = TextWrapping.Wrap });
+        if (outputPermission) content.Children.Add(new TextBlock { Text = "This addon can also send processed video and audio to the approved HTTP services.", TextWrapping = TextWrapping.Wrap });
+        if (inputPermission) content.Children.Add(new TextBlock { Text = "This addon can also read and process media from the approved HTTP services.", TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = "Device addresses: " + string.Join(", ", ((JsonArray)destinations[0]!["addresses"]!).Select(a => a!.GetValue<string>())), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = "This saves the address and grants access to all services above together. Reconnect here if the device's IP address changes. A running addon stops while its device access changes.", TextWrapping = TextWrapping.Wrap });
+        if (!await ConsentAsync(owner, content, "Connect device")) return null;
+        await CallAsync("network.approveDevice", new() { ["id"] = id, ["expectedHash"] = hash, ["reviewId"] = reviewed["reviewId"]!.DeepClone() });
+        await RefreshSelectedStatusAsync(); await RefreshNetworkAsync();
+        Control<TextBlock>("Status").Text = "Device address saved and access granted. Start the addon to use it. Other unsaved settings remain in the form.";
+        return reviewed["host"]!.GetValue<string>();
+    }
+
     private static StackPanel NetworkPanel(string title, string id)
     {
         var content = new StackPanel { Margin = new Thickness(24), Spacing = 12 };

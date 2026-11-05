@@ -56,5 +56,28 @@ internal static class NetworkUiChecks
         Check(server.Profiles.Count == 1, "Destination revocation changed media access.");
         Check(draft.Text == "Pending service setup" && Find<StackPanel>("SettingFields").GetVisualDescendants().Contains(draft), "Service or credential changes discarded unsaved addon settings.");
         draft.Text = saved;
+        server.DeviceSettings = true; server.Values["device"] = "";
+        Find<Button>("RefreshButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => Find<Button>("RefreshButton").IsEnabled);
+        var device = Find<StackPanel>("SettingFields").Children.OfType<StackPanel>().Last();
+        var address = device.Children.OfType<TextBox>().Single(); address.Text = "hyperl2.local";
+        var connect = device.Children.OfType<Button>().Single();
+        Check(connect.IsEnabled && connect.Content as string == "Connect", "Address field must offer Connect.");
+        connect.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => window.OwnedWindows.Count > 0);
+        dialog = window.OwnedWindows.Single();
+        Check(dialog.GetVisualDescendants().OfType<TextBlock>().Count(t => t.Text is "http://hyperl2.local:80" or "udp://hyperl2.local:4048") == 2, "One review must show both services.");
+        using (var image = dialog.CaptureRenderedFrame()) image!.Save(Path.Combine(output, "addon-device-connect.png"));
+        dialog.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => Find<Button>("RefreshButton").IsEnabled);
+        Check(server.Destinations.Count == 0 && server.Values["device"]!.GetValue<string>() == "", "Cancel must not save or grant access.");
+        connect.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => window.OwnedWindows.Count > 0);
+        window.OwnedWindows.Single().GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Connect device").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => Find<Button>("RefreshButton").IsEnabled);
+        Check(server.Destinations.Count == 2 && server.NetworkReviewHash == hash && server.NetworkReviewId == "device-review" && address.Text == "hyperl2.local", "Connect must grant both services from the reviewed address.");
+        server.DeviceSettings = false; server.Values.Remove("device"); server.Destinations.Clear();
+        Find<Button>("RefreshButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => Find<Button>("RefreshButton").IsEnabled);
     }
 }

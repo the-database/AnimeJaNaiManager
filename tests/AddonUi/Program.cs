@@ -182,6 +182,8 @@ await session.Dispatch<bool>(async () =>
     Check(mediaDraft.Text == "Pending media setup" && Find<StackPanel>("SettingFields").GetVisualDescendants().Contains(mediaDraft), "Removing media access lost unsaved settings");
     mediaDraft.Text = beforeMedia;
     await NetworkUiChecks.RunAsync(view, window, server, output);
+    if (Environment.GetEnvironmentVariable("AJN_LIGHTING_MANIFEST") is string lightingManifest)
+        await LightingSettingsUiChecks.RunAsync(view, window, server, output, lightingManifest);
     await ListenerUiChecks.RunAsync(view, window, server, output);
     await UsabilityUiChecks.RunAsync(view, window, server, output);
     await view.CloseAsync(); window.Close();
@@ -237,6 +239,8 @@ internal sealed class FixtureServer : IAsyncDisposable
     public JsonObject? ListenerBinding;
     public string? ListenerReviewHash;
     public string? NetworkReviewHash, NetworkReviewId, CredentialValue;
+    public bool DeviceSettings;
+    public JsonObject? SettingsManifest;
     public JsonObject Values = new() { ["enabled"] = true, ["rate"] = 20.0, ["mode"] = "normal", ["name"] = "Hello" };
     public FixtureServer(string directory) { serving = Task.Run(() => ServeAsync(directory)); }
     private async Task ServeAsync(string directory)
@@ -264,7 +268,7 @@ internal sealed class FixtureServer : IAsyncDisposable
                 }
                 JsonNode? result = method switch
                 {
-                    "manager.hello" => new JsonObject { ["major"] = 1, ["nativeMediaAvailable"] = true, ["networkAvailable"] = true, ["httpServerAvailable"] = true, ["listenerTlsAvailable"] = true, ["listenerNetworkAvailable"] = true, ["credentialsAvailable"] = true, ["hostSettingsAvailable"] = true, ["loginSettingsAvailable"] = true },
+                    "manager.hello" => new JsonObject { ["major"] = 1, ["nativeMediaAvailable"] = true, ["networkAvailable"] = true, ["deviceSettingsAvailable"] = true, ["httpServerAvailable"] = true, ["listenerTlsAvailable"] = true, ["listenerNetworkAvailable"] = true, ["credentialsAvailable"] = true, ["hostSettingsAvailable"] = true, ["loginSettingsAvailable"] = true },
                     "host.settings" => new JsonObject { ["maximumConcurrentSessions"] = HostCapacity, ["minimum"] = 1, ["maximum"] = 16, ["editable"] = HostEditable },
                     "host.login" => new JsonObject { ["enabled"] = LoginEnabled, ["available"] = LoginAvailable, ["registeredElsewhere"] = false },
                     "addons.list" => new JsonObject { ["addons"] = new JsonArray(new JsonObject { ["id"] = "org.example.ui", ["name"] = "Sample addon", ["version"] = "0.1.0", ["running"] = Running, ["manual"] = true, ["hash"] = new string('a', 64), ["mediaPermission"] = true, ["networkPermission"] = true, ["credentialPermission"] = true, ["outputPermission"] = true, ["inputPermission"] = true }), ["nextCursor"] = null },
@@ -298,7 +302,15 @@ internal sealed class FixtureServer : IAsyncDisposable
                 if (method == "host.configureLogin") { LoginEnabled = parameters["enabled"]!.GetValue<bool>(); LoginSaves++; }
                 if (method == "addons.settings")
                 {
+                    if (SettingsManifest is not null)
+                    {
+                        result!["definitions"] = SettingsManifest["settings"]!.DeepClone();
+                        result["actions"] = SettingsManifest["actions"]!.DeepClone();
+                    }
+                    else result!["definitions"]!["rate"]!["default"] = 20;
                     result!["values"] = Values.DeepClone();
+                    if (DeviceSettings) result["definitions"]!["device"] = new JsonObject { ["type"] = "string", ["label"] = "Light address", ["default"] = "",
+                        ["deviceEndpoints"] = new JsonArray(new JsonObject { ["name"] = "light-http", ["protocol"] = "http", ["port"] = 80 }, new JsonObject { ["name"] = "light-ddp", ["protocol"] = "udp", ["port"] = 4048 }) };
                     result["invalidSettings"] = new JsonArray(InvalidSettings.Select(v => (JsonNode?)JsonValue.Create(v)).ToArray());
                     if (InvalidSettings.Length > 0) result["values"]!["rate"] = 20;
                 }
@@ -313,6 +325,16 @@ internal sealed class FixtureServer : IAsyncDisposable
                 }
                 if (method.StartsWith("media.") && method != "media.selections") MediaReviewHash = parameters["expectedHash"]!.GetValue<string>();
                 if (method.StartsWith("network.") && method != "network.selections") NetworkReviewHash = parameters["expectedHash"]!.GetValue<string>();
+                if (method == "network.inspectDevice") result = new JsonObject { ["reviewId"] = "device-review", ["host"] = parameters["host"]!.DeepClone(),
+                    ["destinations"] = new JsonArray(new JsonObject { ["origin"] = "http://hyperl2.local:80", ["addresses"] = new JsonArray("192.168.1.220") },
+                        new JsonObject { ["origin"] = "udp://hyperl2.local:4048", ["addresses"] = new JsonArray("192.168.1.220") }) };
+                if (method == "network.approveDevice")
+                {
+                    NetworkReviewId = parameters["reviewId"]!.GetValue<string>(); Values["device"] = "hyperl2.local"; Running = false;
+                    foreach (var protocol in new[] { "http", "udp" }) Destinations.Add(new JsonObject { ["id"] = "device-" + protocol, ["name"] = "light-" + protocol,
+                        ["origin"] = protocol + "://hyperl2.local:" + (protocol == "http" ? 80 : 4048), ["protocol"] = protocol, ["addresses"] = new JsonArray("192.168.1.220") });
+                    result = Values.DeepClone();
+                }
                 if (method == "network.approveDestination")
                 {
                     NetworkReviewId = parameters["reviewId"]!.GetValue<string>();

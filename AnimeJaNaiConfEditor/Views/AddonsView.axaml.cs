@@ -150,13 +150,28 @@ public partial class AddonsView : UserControl
                 string.Join(", ", invalid.Select(v => v!.GetValue<string>())) + ". Defaults are shown for those fields. Review and save to apply them; saved data has not been changed.";
             Control<TextBlock>("SettingsNotice").IsVisible = true;
         }
+        var groups = new Dictionary<string, Expander>(StringComparer.Ordinal);
         foreach (var (key, schema) in data["definitions"] as JsonObject ?? new JsonObject())
         {
             var definition = (JsonObject)schema!;
+            var destination = Control<StackPanel>("SettingFields");
+            if (definition["group"] is JsonValue groupValue)
+            {
+                string groupName = groupValue.GetValue<string>();
+                bool advanced = definition["advanced"]?.GetValue<bool>() == true;
+                if (!groups.TryGetValue(groupName, out var group))
+                {
+                    group = new Expander { Header = groupName, IsExpanded = !advanced,
+                        HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                        Content = new StackPanel { Spacing = 20, Margin = new Thickness(0, 8, 0, 12) } };
+                    groups.Add(groupName, group);
+                    destination.Children.Add(group);
+                }
+                else if (!advanced) group.IsExpanded = true;
+                destination = (StackPanel)group.Content!;
+            }
             var field = new StackPanel { Spacing = 5 };
             field.Children.Add(new TextBlock { Text = definition["label"]!.GetValue<string>(), FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
-            if (definition["description"] is JsonValue description)
-                field.Children.Add(new TextBlock { Text = description.GetValue<string>(), TextWrapping = TextWrapping.Wrap, Opacity = .7 });
             switch (definition["type"]!.GetValue<string>())
             {
                 case "boolean":
@@ -167,16 +182,37 @@ public partial class AddonsView : UserControl
                     var select = new ComboBox { ItemsSource = choices, SelectedItem = values[key]!.GetValue<string>(), HorizontalAlignment = HorizontalAlignment.Stretch };
                     field.Children.Add(select); readSettings[key] = () => JsonValue.Create(select.SelectedItem as string ?? ""); break;
                 case "number":
-                    var number = new TextBox { Text = values[key]!.ToJsonString() };
+                    var number = new TextBox { Text = values[key]!.ToJsonString(), MinWidth = 140, MaxWidth = 220, HorizontalAlignment = HorizontalAlignment.Left };
                     field.Children.Add(number);
+                    field.Children.Add(new TextBlock { Text = "Default: " + definition["default"]!.ToJsonString() +
+                        (definition["minimum"] is not null && definition["maximum"] is not null
+                            ? "  ·  Range: " + definition["minimum"]!.ToJsonString() + " to " + definition["maximum"]!.ToJsonString() : ""),
+                        FontSize = 12, Opacity = .7, TextWrapping = TextWrapping.Wrap });
                     readSettings[key] = () => (double.TryParse(number.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out double n) ||
                         double.TryParse(number.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out n)) && double.IsFinite(n)
                         ? JsonValue.Create(n) : throw new FormatException("Enter a valid number for " + definition["label"]!.GetValue<string>() + "."); break;
                 default:
                     var text = new TextBox { Text = values[key]!.GetValue<string>(), MaxLength = definition["maxLength"]?.GetValue<int>() ?? 4096 };
-                    field.Children.Add(text); readSettings[key] = () => JsonValue.Create(text.Text ?? ""); break;
+                    field.Children.Add(text); readSettings[key] = () => JsonValue.Create(text.Text ?? "");
+                    if (definition["deviceEndpoints"] is JsonArray)
+                    {
+                        text.PlaceholderText = "Device hostname or IP address";
+                        var connect = new Button { Content = "Connect", HorizontalAlignment = HorizontalAlignment.Left,
+                            IsEnabled = client?.ServerInfo["deviceSettingsAvailable"]?.GetValue<bool>() == true };
+                        connect.Click += async (_, _) => await RunAsync(async () =>
+                        {
+                            if (selectedHash is not string hash) return;
+                            var owner = TopLevel.GetTopLevel(this) as Window ?? throw new IOException("Could not open device settings.");
+                            string? host = await ConnectDeviceAsync(owner, id, hash, key, definition["label"]!.GetValue<string>(), text.Text ?? "");
+                            if (host is not null) { text.Text = host; savedValues[key] = host; }
+                        });
+                        field.Children.Add(connect);
+                    }
+                    break;
             }
-            Control<StackPanel>("SettingFields").Children.Add(field);
+            if (definition["description"] is JsonValue description)
+                field.Children.Add(new TextBlock { Text = description.GetValue<string>(), TextWrapping = TextWrapping.Wrap, Opacity = .8 });
+            destination.Children.Add(field);
         }
         Control<Button>("SaveButton").IsVisible = readSettings.Count > 0;
         foreach (var (key, schema) in data["actions"] as JsonObject ?? new JsonObject())
@@ -192,6 +228,9 @@ public partial class AddonsView : UserControl
                 await RefreshSelectedStatusAsync();
             }, announceSuccess: false);
             Control<StackPanel>("ActionFields").Children.Add(action);
+            if (schema["description"] is JsonValue actionDescription)
+                Control<StackPanel>("ActionFields").Children.Add(new TextBlock { Text = actionDescription.GetValue<string>(),
+                    TextWrapping = TextWrapping.Wrap, Opacity = .8, Margin = new Thickness(0, 0, 0, 10) });
         }
         await RefreshMediaAsync();
         await RefreshNetworkAsync();
