@@ -181,7 +181,7 @@
     <vm:MainWindowViewModel/>
   </Design.DataContext>
 
-  <TabControl SelectedIndex="{Binding SelectedTabIndex}" Padding="10,4,10,10">
+  <TabControl x:Name="MainTabs" SelectedIndex="{Binding SelectedTabIndex}" Padding="10,4,10,10">
   <TabItem Header="Profiles">
   <Grid x:Name="ProfilesGrid" RowDefinitions="*">
     <Grid.ColumnDefinitions>
@@ -788,6 +788,9 @@
         <TextBlock Text="{Binding ComponentManager.StatusLine}" TextWrapping="Wrap" Opacity="0.7"/>
       </StackPanel>
     </ScrollViewer>
+  </TabItem>
+  <TabItem Header="Addons" x:Name="AddonsTab">
+    <views:AddonsView x:Name="AddonPanel"/>
   </TabItem>
   <TabItem Header="Troubleshooting">
     <views:DiagnosticsView x:Name="DiagnosticsPanel"/>
