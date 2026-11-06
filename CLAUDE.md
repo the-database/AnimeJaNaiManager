@@ -16,7 +16,9 @@ dotnet publish -c Release        # Publish self-contained win-x64 executable
 
 No linter is configured. `dotnet run --project tests/ProfileRoundTrip` is a console regression
 test for conf/profile serialization (it compiles the production view-model files); it exits
-nonzero on failure.
+nonzero on failure. `dotnet run --project tests/RuntimePacks` checks where the "TensorRT installed"
+check looks: the shared pack store's TensorRT pack that `animejanai/inference/aji-runtime.json` names
+(written by the updater's store mode), else the inference folder.
 
 ## Architecture
 
