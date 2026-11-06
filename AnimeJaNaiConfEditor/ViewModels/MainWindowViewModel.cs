@@ -54,10 +54,10 @@ namespace AnimeJaNaiConfEditor.ViewModels
         // Install state comes from the disk (works offline); GPU identity comes from the
         // component engine once its refresh completes.
 
-        // The TensorRT core library: nvinfer_11.dll on Windows, libnvinfer.so.11 on Linux.
-        public static bool TrtOnDisk() =>
-            File.Exists(Path.Combine(DataDir, "inference",
-                OperatingSystem.IsWindows() ? "nvinfer_11.dll" : "libnvinfer.so.11"));
+        // The TensorRT core library: nvinfer_11.dll on Windows, libnvinfer.so.11 on Linux. In the
+        // shared pack store when inference/aji-runtime.json names its TensorRT pack (the updater's store
+        // mode), else in the inference folder.
+        public static bool TrtOnDisk() => Services.RuntimePacks.TrtInstalled(Path.Combine(DataDir, "inference"));
 
         // DirectML (D3D12) is Windows-only; on Linux TensorRT is the only backend.
         public bool DirectMlAvailable => OperatingSystem.IsWindows();
