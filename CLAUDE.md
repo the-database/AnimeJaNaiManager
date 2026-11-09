@@ -18,7 +18,9 @@ No linter is configured. `dotnet run --project tests/ProfileRoundTrip` is a cons
 test for conf/profile serialization (it compiles the production view-model files); it exits
 nonzero on failure. `dotnet run --project tests/RuntimePacks` checks where the "TensorRT installed"
 check looks: the shared pack store's TensorRT pack that `animejanai/inference/aji-runtime.json` names
-(written by the updater's store mode), else the inference folder.
+(written by the updater's store mode), else the inference folder. `dotnet run --project tests/Storage`
+covers Components > Storage (moving the shared pack store through `aji-runtime location/move/reset`);
+set `AJI_RUNTIME_EXE` to an aji-runtime 0.2.0+ build to also drive the real tool on a temporary store.
 
 ## Architecture
 
