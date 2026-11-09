@@ -34,8 +34,11 @@ jobs:
         dotnet-version: '10.x'  # Must match <TargetFramework> in AnimeJaNaiConfEditor.csproj
 
     - name: Publish self-contained single-file win-x64
+      shell: pwsh
       # Publish directly (not via FolderProfile.pubxml, which sets SelfContained=false).
-      run: dotnet publish AnimeJaNaiConfEditor/AnimeJaNaiConfEditor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+      run: |
+        ./tools/check-addon-client.ps1
+        dotnet publish AnimeJaNaiConfEditor/AnimeJaNaiConfEditor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
 
     - name: Stage runtime files only
       # Keep just the executable and the native Avalonia DLLs (Skia/HarfBuzz/ANGLE).

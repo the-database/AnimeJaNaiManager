@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimeJaNaiConfEditor.Views.AddonsView">
+  <Grid Margin="24" RowDefinitions="Auto,Auto,*" ColumnDefinitions="260,*" RowSpacing="14" ColumnSpacing="20">
+    <StackPanel Grid.ColumnSpan="2" Spacing="8">
+      <TextBlock Text="Addons" FontSize="22" FontWeight="SemiBold"/>
+      <TextBlock Text="Add features to AJN. Install an addon package, choose what it can access, and customize its settings."
+                 TextWrapping="Wrap" Opacity="0.75"/>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="InstallButton" Content="Install addon…" Click="InstallClick" IsEnabled="False"/>
+        <Button x:Name="RefreshButton" Content="Reload" Click="RefreshClick" IsEnabled="False"/>
+        <Button x:Name="RetryButton" Content="Try again" Click="RetryClick" IsVisible="False"/>
+        <Button x:Name="HostSettingsButton" Content="Performance limits" Click="HostSettingsClick" IsVisible="False" IsEnabled="False"/>
+        <Button x:Name="LoginSettingsButton" Content="Windows startup" Click="LoginSettingsClick" IsVisible="False" IsEnabled="False"/>
+        <Button Content="Help" Click="HelpClick"/>
+      </StackPanel>
+    </StackPanel>
+    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="6">
+      <TextBlock x:Name="Status" Text="Opening addons…" TextWrapping="Wrap"/>
+      <Expander x:Name="ErrorDetails" Header="Technical details" IsVisible="False">
+        <TextBox x:Name="ErrorText" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="110"/>
+      </Expander>
+    </StackPanel>
+    <ListBox x:Name="AddonList" Grid.Row="2" SelectionChanged="SelectionChanged" MinHeight="200"/>
+    <ScrollViewer Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="12" Margin="0,0,12,16">
+        <TextBlock x:Name="AddonTitle" Text="Select an addon" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock x:Name="AddonState" TextWrapping="Wrap" Opacity="0.75"/>
+        <TextBlock x:Name="RuntimeNotice" TextWrapping="Wrap" IsVisible="False" Opacity="0.75"/>
+        <WrapPanel Orientation="Horizontal">
+          <Button x:Name="StartButton" Content="Start addon" Click="StartClick" IsEnabled="False" Margin="0,0,8,8"/>
+          <Button x:Name="StopButton" Content="Stop addon" Click="StopClick" IsEnabled="False" Margin="0,0,8,8"/>
+          <Button x:Name="RollbackButton" Content="Previous version" Click="RollbackClick" IsEnabled="False" Margin="0,0,8,8"/>
+          <Button x:Name="RemoveButton" Content="Remove" Click="RemoveClick" IsEnabled="False" Margin="0,0,8,8"/>
+        </WrapPanel>
+        <StackPanel x:Name="MediaSection" IsVisible="False" Spacing="8">
+          <TextBlock Text="Processing access" FontWeight="SemiBold"/>
+          <TextBlock x:Name="MediaNotice" TextWrapping="Wrap"/>
+          <WrapPanel>
+            <Button x:Name="ApproveSourceButton" Content="Allow a media file" Click="ApproveSourceClick" Margin="0,0,8,8"/>
+            <Button x:Name="ApproveProfileButton" Content="Allow a saved profile" Click="ApproveProfileClick" Margin="0,0,8,8"/>
+          </WrapPanel>
+          <StackPanel x:Name="MediaFields" Spacing="8"/>
+        </StackPanel>
+        <StackPanel x:Name="NetworkSection" IsVisible="False" Spacing="8">
+          <TextBlock Text="Service and device access" FontWeight="SemiBold"/>
+          <TextBlock x:Name="NetworkNotice" TextWrapping="Wrap"/>
+          <Button x:Name="ApproveDestinationButton" Content="Allow a service or device" Click="ApproveDestinationClick" HorizontalAlignment="Left"/>
+          <StackPanel x:Name="NetworkFields" Spacing="10"/>
+        </StackPanel>
+        <StackPanel x:Name="ListenerSection" IsVisible="False" Spacing="8">
+          <TextBlock Text="Listening access" FontWeight="SemiBold"/>
+          <TextBlock x:Name="ListenerNotice" TextWrapping="Wrap"/>
+          <Button x:Name="ApproveListenerButton" Content="Allow client connections" Click="ApproveListenerClick" HorizontalAlignment="Left"/>
+          <StackPanel x:Name="ListenerFields" Spacing="10"/>
+        </StackPanel>
+        <TextBlock x:Name="SettingsNotice" IsVisible="False" TextWrapping="Wrap"/>
+        <StackPanel x:Name="SettingFields" Spacing="12"/>
+        <Button x:Name="SaveButton" Content="Save settings" Click="SaveClick" IsVisible="False" HorizontalAlignment="Left"/>
+        <TextBlock x:Name="ActionsNotice" TextWrapping="Wrap" IsVisible="False"/>
+        <StackPanel x:Name="ActionFields" Spacing="8"/>
+        <TextBlock x:Name="ActionResult" TextWrapping="Wrap"/>
+        <TextBlock Text="Recent addon messages" FontWeight="SemiBold"/>
+        <TextBox x:Name="LogText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" MaxHeight="240"/>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

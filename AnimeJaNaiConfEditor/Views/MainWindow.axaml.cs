@@ -30,11 +30,24 @@ namespace AnimeJaNaiConfEditor.Views
         public MainWindow()
         {
             AvaloniaXamlLoader.Load(this);
+            RefreshAddonSupport();
+            Activated += (_, _) => RefreshAddonSupport();
+            this.FindControl<AddonsView>("AddonPanel")?.ProtectUnsavedSettingsOnClose(this);
             Closing += MainWindow_Closing;
             Opened += MainWindow_Opened;
         }
 
-        private void MainWindow_Opened(object? sender, EventArgs e)
+        private void RefreshAddonSupport()
+        {
+            if (this.FindControl<TabItem>("AddonsTab") is { } addonsTab)
+            {
+                addonsTab.IsVisible = AddonsView.SupportInstalled;
+                if (!addonsTab.IsVisible && addonsTab.IsSelected && this.FindControl<TabControl>("MainTabs") is { } tabs)
+                    tabs.SelectedIndex = 0;
+            }
+        }
+
+        private async void MainWindow_Opened(object? sender, EventArgs e)
         {
             if (DataContext is MainWindowViewModel vm &&
                 this.FindControl<Grid>("ProfilesGrid") is { } grid)
@@ -42,6 +55,7 @@ namespace AnimeJaNaiConfEditor.Views
                 var sidebar = grid.ColumnDefinitions[0];
                 sidebar.Width = new GridLength(Math.Clamp(vm.SidebarWidth, sidebar.MinWidth, sidebar.MaxWidth));
             }
+            if (this.FindControl<AddonsView>("AddonPanel") is { } addons) await addons.ManagerOpenedAsync();
         }
 
         private void SidebarSplitterDragCompleted(object? sender, VectorEventArgs e)
@@ -64,6 +78,7 @@ namespace AnimeJaNaiConfEditor.Views
 
         private async void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
         {
+            if (e.Cancel) return;
             UiState.Save();
             var diagnostics = this.FindControl<DiagnosticsView>("DiagnosticsPanel");
             if (diagnostics?.IsBusy == true)

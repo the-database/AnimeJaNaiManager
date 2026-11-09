@@ -1,0 +1,67 @@
+name: Addon Manager UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ['AnimeJaNaiConfEditor/**', 'tests/AddonUi/**', '.github/workflows/addon-ui.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify and render addon controls
+        shell: pwsh
+        run: |
+          dotnet run --project ./tests/AddonUi/AddonUi.csproj -c Release '-p:UsedAvaloniaProducts=' -- ./addon-ui-results
+          if ($LASTEXITCODE) { throw 'Addon UI checks failed' }
+          foreach ($case in 'startup-close', 'missing-runtime', 'empty-installation') {
+            $env:AJN_UI_CASE = $case
+            dotnet run --no-build --project ./tests/AddonUi/AddonUi.csproj -c Release -- "./addon-ui-results/$case"
+            if ($LASTEXITCODE) { throw "Addon startup check failed: $case" }
+          }
+          Remove-Item Env:AJN_UI_CASE
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: the-database/mpv-AnimeJaNai
+          # Immutable pre-merge source from host PR 227, not merged main yet.
+          # Merge the host PR first, then pin its resulting main commit here
+          # before merging Manager (including after a squash/rebase merge).
+          # Releases verify the in-tree snapshot, without this checkout.
+          ref: be8e1f480dc04e9650e6612cdaeeff952832201f
+          path: host-source
+      - name: Prepare the matching packaged host
+        shell: pwsh
+        run: |
+          ./tools/check-addon-client.ps1 -CanonicalSourcePath ./host-source/addons/sdk/csharp/ManagementClient.cs
+          ./host-source/addons/tools/bootstrap.ps1
+          ./host-source/addons/tools/package.ps1 -OutputDirectory ./host-bundle
+          New-Item -ItemType Directory -Path integration-root/addon-development -Force | Out-Null
+          Copy-Item -LiteralPath ./host-bundle/host -Destination ./integration-root/addon-host -Recurse
+          Copy-Item -LiteralPath ./host-bundle/runtime -Destination ./integration-root/addon-host/runtime -Recurse
+          Copy-Item -LiteralPath ./host-bundle/counter.ajnaddon -Destination ./integration-root/addon-development
+          Copy-Item -LiteralPath ./host-bundle/service-inspector.ajnaddon -Destination ./integration-root/addon-development
+          Copy-Item ./host-bundle/*.html -Destination ./integration-root/addon-development
+      - name: Verify Manager with the packaged host and real Wasm addon
+        shell: pwsh
+        run: dotnet run --project ./tests/AddonUi/AddonUi.csproj -c Release '-p:UsedAvaloniaProducts=' -- ./addon-integration-results ./integration-root
+      - name: Preserve validation and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: addon-manager-ui-results
+          path: |
+            addon-ui-results/*.json
+            addon-ui-results/*.png
+            addon-integration-results/*.json
+            addon-integration-results/*.png
+          if-no-files-found: warn
