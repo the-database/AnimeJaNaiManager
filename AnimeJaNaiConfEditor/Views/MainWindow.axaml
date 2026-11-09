@@ -753,10 +753,16 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <StackPanel Margin="24" Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
         <TextBlock Text="{Binding ComponentManager.GpuText}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
-        <Border Classes="border" IsVisible="{Binding ComponentManager.SetupNeeded}">
+        <Border Classes="border" IsVisible="{Binding ShowSetupNeeded}">
           <Grid ColumnDefinitions="Auto,*">
             <materialIcons:MaterialIcon Grid.Column="0" Kind="AlertCircleOutline" Width="20" Height="20" Foreground="Orange" VerticalAlignment="Top" Margin="0,2,8,0"/>
             <TextBlock Grid.Column="1" TextWrapping="Wrap" Text="Components recommended for this PC are not installed. Check the highlighted items below, then click Apply changes to install them."/>
+          </Grid>
+        </Border>
+        <Border Classes="border" IsVisible="{Binding StorageMissing}">
+          <Grid ColumnDefinitions="Auto,*">
+            <materialIcons:MaterialIcon Grid.Column="0" Kind="AlertCircleOutline" Width="20" Height="20" Foreground="Orange" VerticalAlignment="Top" Margin="0,2,8,0"/>
+            <TextBlock Grid.Column="1" TextWrapping="Wrap" Text="{Binding StorageMissingBanner}"/>
           </Grid>
         </Border>
         <ItemsControl ItemsSource="{Binding ComponentManager.Packs}" IsEnabled="{Binding ComponentManager.NotBusy}">
@@ -786,6 +792,28 @@
           <Button Content="Refresh" Command="{Binding ComponentManager.Refresh}" IsEnabled="{Binding ComponentManager.NotBusy}"/>
         </StackPanel>
         <TextBlock Text="{Binding ComponentManager.StatusLine}" TextWrapping="Wrap" Opacity="0.7"/>
+
+        <!-- Storage: where the shared pack store is -->
+        <Border Classes="border" x:Name="StorageSection" IsVisible="{Binding ShowStorage}" Margin="0,12,0,0">
+          <StackPanel Spacing="12">
+            <TextBlock Text="Storage" FontWeight="SemiBold"/>
+            <TextBlock TextWrapping="Wrap" Text="The TensorRT runtime and its GPU kernels (a few GB) live in one folder that all your JaNai apps share. Move it to put them on another drive. Close the player and your other JaNai apps first."/>
+            <TextBlock FontFamily="Consolas" TextWrapping="Wrap" Text="{Binding StorageFolderText}"/>
+            <TextBlock TextWrapping="Wrap" Opacity="0.7" Text="{Binding StorageText}"/>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Content="Move..." Click="MoveStorageButtonClick" IsEnabled="{Binding AllowStorageChanges}" IsVisible="{Binding !StorageMissing}"
+                      ToolTip.Tip="Move the shared folder to a new or empty folder on another drive. Nothing is downloaded again."/>
+              <Button Content="Move Back to Default" Click="MoveStorageBackButtonClick" IsEnabled="{Binding AllowStorageChanges}" IsVisible="{Binding StorageMoved}"
+                      ToolTip.Tip="Move the shared folder back to its default place. Nothing is downloaded again."/>
+              <Button Content="Try Again" Command="{Binding RefreshStorage}" IsEnabled="{Binding AllowStorageChanges}" IsVisible="{Binding StorageMissing}"
+                      ToolTip.Tip="Check the folder again, for example after connecting its drive."/>
+              <Button Content="Reset to Default" Click="ResetStorageButtonClick" IsEnabled="{Binding AllowStorageChanges}" IsVisible="{Binding StorageMissing}"
+                      ToolTip.Tip="Stop using the missing folder: start an empty one in the default place and download the TensorRT components again."/>
+            </StackPanel>
+            <TextBlock FontFamily="Consolas" TextWrapping="Wrap" Opacity="0.7" Text="{Binding StorageStatusText}"
+                       IsVisible="{Binding StorageStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          </StackPanel>
+        </Border>
       </StackPanel>
     </ScrollViewer>
   </TabItem>

@@ -45,6 +45,8 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
             RefreshComponentAwareness();
             ComponentManager.Refreshed += RefreshComponentAwareness;
+            this.WhenAnyValue(x => x.ComponentManager.IsBusy).Subscribe(_ => this.RaisePropertyChanged(nameof(AllowStorageChanges)));
+            this.WhenAnyValue(x => x.ComponentManager.SetupNeeded).Subscribe(_ => this.RaisePropertyChanged(nameof(ShowSetupNeeded)));
             this.WhenAnyValue(x => x.AnimeJaNaiConf.DirectMlSelected).Subscribe(_ => RaiseGpuChoice());
             _ = LoadDxgiGpusAsync();
             _ = InitializeComponentManagerAsync();
@@ -139,8 +141,19 @@ namespace AnimeJaNaiConfEditor.ViewModels
             bool trtUsable = trtInstalled && nvidia != false;
             TrtSelectable = trtUsable;
 
+            // TensorRT in the shared pack store looks missing while the store's moved folder is (an
+            // unplugged drive), and until the store's location has been read. That isn't "not
+            // installed", so the backend stays as it is.
+            bool storeUnknownOrMissing = !trtInstalled && StoreLocation.UsedBy(RootDir, DataDir) && (!_storageRead || StorageMissing);
+
             string notice = "";
-            if (!DirectMlAvailable)
+            if (storeUnknownOrMissing)
+            {
+                TrtSelectable = true;
+                if (StorageMissing)
+                    notice = StoreLocation.MissingMessage(StorageFolderText);
+            }
+            else if (!DirectMlAvailable)
             {
                 // Linux has no DirectML: TensorRT is the only backend, installed or not
                 TrtSelectable = true;
@@ -390,7 +403,130 @@ namespace AnimeJaNaiConfEditor.ViewModels
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
-            set => this.RaiseAndSetIfChanged(ref _selectedTabIndex, value);
+            set
+            {
+                bool opened = value == ComponentsTabIndex && _selectedTabIndex != value;
+                this.RaiseAndSetIfChanged(ref _selectedTabIndex, value);
+                if (opened)
+                {
+                    _ = RefreshStorage();
+                }
+            }
+        }
+
+        private const int ComponentsTabIndex = 1;
+
+        // The setup banner, unless the TensorRT packs only look missing because their folder is.
+        public bool ShowSetupNeeded => ComponentManager.SetupNeeded && !StorageMissing;
+
+        // ---- Storage: where the shared pack store is (Components > Storage) ----------------------
+
+        private bool _storageRead; // Storage has been set (by RefreshStorage)
+        private StoreLocation.Info? _storage;
+        public StoreLocation.Info? Storage
+        {
+            get => _storage;
+            set
+            {
+                _storageRead = true;
+                this.RaiseAndSetIfChanged(ref _storage, value);
+                this.RaisePropertyChanged(nameof(ShowStorage));
+                this.RaisePropertyChanged(nameof(StorageFolderText));
+                this.RaisePropertyChanged(nameof(StorageMoved));
+                this.RaisePropertyChanged(nameof(StorageMissing));
+                this.RaisePropertyChanged(nameof(StorageText));
+                this.RaisePropertyChanged(nameof(StorageMissingBanner));
+                this.RaisePropertyChanged(nameof(ShowSetupNeeded));
+            }
+        }
+
+        // Only where the player uses the store (StoreLocation.UsedBy) and aji-runtime can say where it is.
+        public bool ShowStorage => Storage is not null;
+        public string StorageFolderText => Storage?.Folder ?? "";
+        public bool StorageMoved => Storage?.MovedHere == true;
+        public bool StorageMissing => Storage?.Missing == true;
+        public string StorageText => Storage?.Text ?? "";
+
+        public string StorageMissingBanner =>
+            $"The shared runtime's folder {StorageFolderText} isn't available, so TensorRT can't run. Is its drive connected? Reconnect it and click Try Again, or reset the location under Storage below.";
+
+        private bool _storageBusy;
+        public bool StorageBusy
+        {
+            get => _storageBusy;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _storageBusy, value);
+                this.RaisePropertyChanged(nameof(AllowStorageChanges));
+            }
+        }
+
+        public bool AllowStorageChanges => !StorageBusy && ComponentManager.NotBusy;
+
+        private string _storageStatusText = string.Empty;
+        public string StorageStatusText
+        {
+            get => _storageStatusText;
+            set => this.RaiseAndSetIfChanged(ref _storageStatusText, value);
+        }
+
+        public async Task RefreshStorage()
+        {
+            Storage = StoreLocation.UsedBy(RootDir, DataDir) ? await StoreLocation.GetAsync(RootDir) : null;
+            RefreshComponentAwareness();
+        }
+
+        // The store's size, for the confirmations.
+        public Task<long> StorageBytes() => Storage is { } s ? Task.Run(() => StoreLocation.Size(s.Folder)) : Task.FromResult(0L);
+
+        public Task MoveStorage(string folder) => ChangeStorage(["move", StoreLocation.MoveTarget(folder)], "Moving the shared runtime");
+
+        public Task MoveStorageBack() => ChangeStorage(["move", "--default"], "Moving the shared runtime back");
+
+        // Reset: the store's folder is gone, so the default folder starts empty, and this install's
+        // TensorRT components are installed again the way first-run setup does it (the other apps
+        // reinstall theirs when they next need them).
+        public async Task ResetStorage()
+        {
+            if (!await ChangeStorage(["reset"], "Resetting the storage location") || Storage is not { Moved: false })
+            {
+                return;
+            }
+            StorageStatusText = "Downloading the TensorRT components again...";
+            await ComponentManager.RefreshAsync();
+            await ComponentManager.InstallMissingPreselectedAsync();
+            StorageStatusText = ComponentManager.MissingPreselected.Count == 0
+                ? "Done."
+                : "Some components weren't installed. Check them above and click Apply changes.";
+        }
+
+        private async Task<bool> ChangeStorage(string[] args, string doing)
+        {
+            if (!AllowStorageChanges)
+            {
+                return false;
+            }
+            StorageBusy = true;
+            ComponentManager.IsBusy = true; // no component changes meanwhile
+            StorageStatusText = $"{doing}...";
+            string? error;
+            try
+            {
+                error = await StoreLocation.ChangeAsync(RootDir, args, (done, total) =>
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        StorageStatusText = total > 0
+                            ? string.Format(CultureInfo.InvariantCulture, "{0}: {1:0.0} of {2:0.0} GB", doing, done / 1e9, total / 1e9)
+                            : $"{doing}..."));
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+            }
+            StorageStatusText = error ?? "Done.";
+            ComponentManager.IsBusy = false;
+            StorageBusy = false;
+            await RefreshStorage();
+            return error is null;
         }
 
         // First-run setup: if the hardware's recommended components are missing
@@ -399,12 +535,19 @@ namespace AnimeJaNaiConfEditor.ViewModels
         // tab, and 3.3.0 set the bar by shipping preconfigured.
         private async Task InitializeComponentManagerAsync()
         {
+            await RefreshStorage();
             await ComponentManager.RefreshAsync();
+            if (StorageMissing)
+            {
+                // the TensorRT packs aren't missing, their folder is: say so on the Components tab
+                SelectedTabIndex = ComponentsTabIndex;
+                return;
+            }
             if (!ComponentManager.SetupNeeded)
             {
                 return;
             }
-            SelectedTabIndex = 1;
+            SelectedTabIndex = ComponentsTabIndex;
 
             var missing = ComponentManager.MissingPreselected;
             var lines = string.Join("\n",
