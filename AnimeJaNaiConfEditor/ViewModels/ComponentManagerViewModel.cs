@@ -77,9 +77,14 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         public AvaloniaList<ComponentItem> Packs { get; } = [];
 
-        // GPU identity from the engine's NVML detection; null until a refresh
-        // has completed (callers fall back to disk-state-only behavior).
+        // GPU identity from the engine's NVML detection: whether an NVIDIA GPU can run TensorRT
+        // (one too old for it doesn't count: Services.TensorRtGpus); null until a refresh has
+        // completed (callers fall back to disk-state-only behavior).
         public bool? GpuNvidia { get; private set; }
+
+        // The NVIDIA GPUs too old for TensorRT ("NVIDIA GeForce GTX 1080 (compute 6.1)"), for the
+        // backend notice. Empty until a refresh completes.
+        public IReadOnlyList<string> TensorRtTooOld { get; private set; } = [];
 
         public bool TrtPackAvailable { get; private set; }
 
@@ -156,19 +161,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
                 using var doc = JsonDocument.Parse(output);
                 var root = doc.RootElement;
-                var gpu = root.GetProperty("gpu");
-                bool nvidia = gpu.GetProperty("nvidia").GetBoolean();
-                GpuText = nvidia
-                    ? $"GPU: {gpu.GetProperty("name").GetString()}"
-                    : "GPU: no NVIDIA device detected — the built-in DirectML engine covers AMD and Intel GPUs";
-                GpuNvidia = nvidia;
-                NvidiaGpus = root.TryGetProperty("gpus", out var gpus) && gpus.ValueKind == JsonValueKind.Array
-                    ? gpus.EnumerateArray()
-                        .Select(g => (Name: g.GetProperty("name").GetString() ?? "",
-                                      Uuid: g.GetProperty("uuid").GetString() ?? ""))
-                        .Where(g => g.Name.Length > 0 && g.Uuid.Length > 0)
-                        .ToList()
-                    : [];
+                var report = Services.TensorRtGpus.Read(root);
+                GpuText = Services.TensorRtGpus.GpuText(report, OperatingSystem.IsWindows());
+                GpuNvidia = report.Nvidia;
+                TensorRtTooOld = report.TooOld;
+                NvidiaGpus = report.Gpus;
 
                 Packs.Clear();
                 foreach (var e in root.GetProperty("packs").EnumerateArray())

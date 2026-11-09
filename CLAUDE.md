@@ -21,6 +21,12 @@ check looks: the shared pack store's TensorRT pack that `animejanai/inference/aj
 (written by the updater's store mode), else the inference folder. `dotnet run --project tests/Storage`
 covers Components > Storage (moving the shared pack store through `aji-runtime location/move/reset`);
 set `AJI_RUNTIME_EXE` to an aji-runtime 0.2.0+ build to also drive the real tool on a temporary store.
+`dotnet run --project tests/TensorRtGpus` checks which NVIDIA GPUs count for TensorRT
+(`Services/TensorRtGpus.cs`): it needs compute capability 7.5+ (GeForce RTX 20 / GTX 16 series and
+newer, `TrtMinComputeCapability`). An older GPU counts as no NVIDIA GPU, so TensorRT isn't
+selectable and the backend falls back to DirectML; the updater reports such GPUs in
+`unsupported_gpus` (and leaves them out of `gpu.nvidia`, `gpu.sm` and `gpus`), and for an updater
+from before that the Manager applies the rule to `gpu.sm` itself.
 
 ## Architecture
 

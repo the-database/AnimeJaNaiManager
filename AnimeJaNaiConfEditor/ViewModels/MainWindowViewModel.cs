@@ -162,7 +162,10 @@ namespace AnimeJaNaiConfEditor.ViewModels
                     AnimeJaNaiConf.BackendAutoFallback = false;
                     AnimeJaNaiConf.SetTensorRtSelected();
                 }
-                if (!trtInstalled)
+                if (nvidia == false && ComponentManager.TensorRtTooOld.Count > 0)
+                    notice = Services.TensorRtGpus.TooOldNotice(ComponentManager.TensorRtTooOld) +
+                        " Upscaling on Linux needs TensorRT.";
+                else if (!trtInstalled)
                     notice = "TensorRT is not installed - install it from the Components tab.";
             }
             else if (trtUsable && AnimeJaNaiConf != null && AnimeJaNaiConf.DirectMlSelected &&
@@ -186,7 +189,9 @@ namespace AnimeJaNaiConfEditor.ViewModels
                     flipped = "Switched to DirectML: ";
                 }
                 notice = nvidia == false
-                    ? flipped + "TensorRT requires an NVIDIA GPU."
+                    ? flipped + (ComponentManager.TensorRtTooOld.Count > 0
+                        ? Services.TensorRtGpus.TooOldNotice(ComponentManager.TensorRtTooOld)
+                        : "TensorRT requires an NVIDIA GPU.")
                     : ComponentManager.TrtPackAvailable
                         ? flipped + "TensorRT is not installed — install it from the Components tab (recommended for NVIDIA GPUs); the backend switches back automatically once installed."
                         : flipped + "TensorRT is not installed.";
