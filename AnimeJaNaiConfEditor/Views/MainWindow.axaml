@@ -718,7 +718,7 @@
                           <ContentControl Classes="hint" ToolTip.Tip="Whether or not to use the ensemble version of the model, which improves quality but runs slower.">
                             <CheckBox IsChecked="{Binding RifeEnsemble}" Content="Ensemble" />
                           </ContentControl>
-                          <ContentControl Classes="hint" ToolTip.Tip="Use experimental motion-aware scene detection on Windows. May reduce blending across cuts, with extra CPU work while enabled. Off by default. Unsupported frames or late decisions use the Scene Detection Threshold below. Requires matching player and inference updates.">
+                          <ContentControl Classes="hint" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).EnhancedSceneDetectionAvailable}" ToolTip.Tip="Use experimental motion-aware scene detection on Windows. May reduce blending across cuts, with extra CPU work while enabled. Off by default. Unsupported frames or late decisions use the Scene Detection Threshold below. Requires matching player and inference updates.">
                             <CheckBox IsChecked="{Binding RifeEnhancedSceneDetection}" Content="Enhanced scene detection (experimental)" />
                           </ContentControl>
                           <StackPanel Classes="row">

@@ -63,6 +63,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         // DirectML (D3D12) is Windows-only; on Linux TensorRT is the only backend.
         public bool DirectMlAvailable => OperatingSystem.IsWindows();
+        public bool EnhancedSceneDetectionAvailable => OperatingSystem.IsWindows();
 
         public static bool RifeOnDisk() =>
             Directory.Exists(Path.Combine(DataDir, "rife")) &&
