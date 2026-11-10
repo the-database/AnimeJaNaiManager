@@ -1252,6 +1252,7 @@ chain_2_rife=no";
                                 EnableRife = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife")),
                                 //RifeModel = parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_model"),
                                 RifeEnsemble = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_ensemble")),
+                                RifeEnhancedSceneDetection = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_scene_detect_enhanced")),
                                 RifeBeforeUpscale = parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_before_upscale") is { } rbu ? ParseBool(rbu) : true,
                             };
 
@@ -1340,6 +1341,7 @@ chain_2_rife=no";
                             MaxFps = NumericOr(parser, section.SectionName, $"chain_{currentChainNumber}_max_fps"),
                             EnableRife = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife")),
                             RifeEnsemble = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_ensemble")),
+                            RifeEnhancedSceneDetection = ParseBool(parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_scene_detect_enhanced")),
                             RifeBeforeUpscale = parser.GetValue(section.SectionName, $"chain_{currentChainNumber}_rife_before_upscale") is { } rbu ? ParseBool(rbu) : true,
                         };
 
@@ -1556,6 +1558,8 @@ chain_2_rife=no";
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_factor_denominator", string.Create(ENGLISH_CULTURE, $"{chain.RifeFactorDenominator ?? 1}"));
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_scene_detect_threshold", string.Create(ENGLISH_CULTURE, $"{chain.RifeSceneDetectThreshold ?? 0.015M}"));
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_ensemble", chain.RifeEnsemble ? "yes" : "no");
+                    if (chain.RifeEnhancedSceneDetection)
+                        parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_scene_detect_enhanced", "yes");
                     parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_before_upscale", chain.RifeBeforeUpscale ? "yes" : "no");
                 }
             }
@@ -1599,6 +1603,8 @@ chain_2_rife=no";
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_factor_denominator", string.Create(ENGLISH_CULTURE, $"{chain.RifeFactorDenominator ?? 1}"));
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_model", string.Create(ENGLISH_CULTURE, $"{RifeLabelToValue(chain.RifeModel)}"));
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_ensemble", chain.RifeEnsemble ? "yes" : "no");
+                if (chain.RifeEnhancedSceneDetection)
+                    parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_scene_detect_enhanced", "yes");
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_scene_detect_threshold", string.Create(ENGLISH_CULTURE, $"{chain.RifeSceneDetectThreshold ?? 0.015M}"));
                 parser.SetValue(section, $"chain_{chain.ChainNumber}_rife_before_upscale", chain.RifeBeforeUpscale ? "yes" : "no");
             }
@@ -2243,6 +2249,7 @@ chain_2_rife=no";
                     x => x.RifeFactorDenominator,
                     x => x.RifeModel,
                     x => x.RifeSceneDetectThreshold,
+                    x => x.RifeEnhancedSceneDetection,
                     x => x.RifeEnsemble,
                     x => x.RifeBeforeUpscale
                 );
@@ -2543,6 +2550,14 @@ chain_2_rife=no";
         {
             get => _rifeFactorDenominator ?? 1;
             set => this.RaiseAndSetIfChanged(ref _rifeFactorDenominator, value ?? 1);
+        }
+
+        private bool _rifeEnhancedSceneDetection;
+        [DataMember]
+        public bool RifeEnhancedSceneDetection
+        {
+            get => _rifeEnhancedSceneDetection;
+            set => this.RaiseAndSetIfChanged(ref _rifeEnhancedSceneDetection, value);
         }
 
         private decimal? _rifeSceneDetectThreshold = 0.150M;
