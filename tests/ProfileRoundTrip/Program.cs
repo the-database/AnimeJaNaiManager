@@ -49,6 +49,35 @@ try
         Console.WriteLine("PASS GPU choice round-trips, Auto writes nothing");
     }
 
+    // Experimental detection is opt-in and must survive save/import/autosave.
+    string baseline = Path.Combine(data, "rife-default.conf");
+    vm.WriteAnimeJaNaiConf(baseline);
+    if (vm.CurrentSlot.Chains[0].RifeEnhancedSceneDetection ||
+        File.ReadAllText(baseline).Contains("rife_scene_detect_enhanced"))
+        throw new Exception("Existing profiles must leave experimental detection off");
+    foreach (bool enhanced in new[] { true, false })
+    {
+        vm.CurrentSlot.Chains[0].RifeEnhancedSceneDetection = enhanced;
+        if (vm.ReadAnimeJaNaiConf(Path.Combine(data, "animejanai.conf"))
+            .UpscaleSlots.First(s => s.SlotNumber == "1").Chains[0].RifeEnhancedSceneDetection != enhanced)
+            throw new Exception($"Autosave lost enhanced detection={enhanced}");
+        string full = Path.Combine(data, $"rife-full-{enhanced}.conf");
+        vm.WriteAnimeJaNaiConf(full);
+        if (vm.ReadAnimeJaNaiConf(full).UpscaleSlots.First(s => s.SlotNumber == "1")
+            .Chains[0].RifeEnhancedSceneDetection != enhanced ||
+            File.ReadAllText(full).Contains("rife_scene_detect_enhanced=yes") != enhanced)
+            throw new Exception($"Full config lost enhanced detection={enhanced}");
+        string profile = Path.Combine(data, $"rife-profile-{enhanced}.conf");
+        vm.WriteAnimeJaNaiCurrentProfileConf(profile);
+        vm.CurrentSlot.Chains[0].RifeEnhancedSceneDetection = !enhanced;
+        vm.ReadAnimeJaNaiConfToCurrentSlot(profile, false);
+        if (vm.CurrentSlot.Chains[0].RifeEnhancedSceneDetection != enhanced)
+            throw new Exception($"Profile import lost enhanced detection={enhanced}");
+        if (!enhanced && File.ReadAllText(full) != File.ReadAllText(baseline))
+            throw new Exception("Disabling enhanced detection must restore the original config");
+        Console.WriteLine($"PASS enhanced detection={enhanced} export/import and autosave");
+    }
+
     foreach (bool ensemble in new[] { true, false })
     {
         vm.CurrentSlot.Chains[0].RifeEnsemble = ensemble;
