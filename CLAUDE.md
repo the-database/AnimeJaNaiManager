@@ -58,7 +58,8 @@ from before that the Manager applies the rule to `gpu.sm` itself.
 **Storage (Components > Storage, `Services/StoreLocation.cs`):** where this copy keeps the TensorRT
 runtime and its GPU kernels (its pack store). The updater (run in the install root) owns the choice:
 `AnimeJaNaiUpdater --storage --json` prints `{"choice": "inside"|"shared"|"custom", "root", "moved",
-"target", "available", "inside", "shared", "installed"}`, and `--storage inside|shared|<folder>`
+"target", "available", "inside", "shared", "installed", "bytes"}` (`bytes`: this copy's TensorRT
+packs, what a switch moves; the confirmation falls back to the folder's size without it), and `--storage inside|shared|<folder>`
 switches and moves the packs (`AJI_MOVE <copied> <total>` progress lines; on failure a non-zero exit
 with the reason as the last output line). The section offers the three options (inside this install,
 shared with the other JaNai apps, a folder the user picks: a folder that already is a store, with

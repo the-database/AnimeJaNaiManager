@@ -64,6 +64,16 @@ try
         Check(inside is { Choice: StoreLocation.StoreChoice.Inside, Installed: true, Available: true, IsShared: false }, "inside");
         Check(inside.Folder == @"D:\mpv\animejanai\runtime" && inside.Inside == inside.Root && inside.SharedFolder == @"C:\Users\me\AppData\Local\the-database\aji", "inside: its folders");
         Check(inside.Text == "", "inside: nothing to say");
+        Check(inside.Bytes is null, "no bytes: an updater from before them");
+        Check(StoreLocation.ParseChoice("""{"choice": "shared", "root": "C:\\aji", "installed": true, "bytes": 445644800}""")!.Bytes == 445644800, "bytes: this copy's packs");
+        Check(StoreLocation.ParseChoice("""{"choice": "inside", "root": "D:\\in", "installed": false, "bytes": 0}""")!.Bytes == 0, "bytes: none");
+        Check(StoreLocation.ParseChoice("""{"choice": "inside", "root": "D:\\in", "bytes": "lots"}""")!.Bytes is null
+            && StoreLocation.ParseChoice("""{"choice": "inside", "root": "D:\\in", "bytes": -1}""")!.Bytes is null
+            && StoreLocation.ParseChoice("""{"choice": "inside", "root": "D:\\in", "bytes": 1.5}""")!.Bytes is null, "bytes that aren't a size");
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+        Check(MainWindowViewModel.Gigabytes(445644800) == "0.4 GB" && MainWindowViewModel.Gigabytes(1_550_000_000) == "1.6 GB", "GB, whatever the culture");
+        System.Globalization.CultureInfo.CurrentCulture = culture;
         var shared = StoreLocation.ParseChoice("""{"choice": "shared", "root": "C:\\aji", "moved": true, "target": "F:\\aji", "available": true, "inside": "D:\\in", "shared": "C:\\aji", "installed": true}""")!;
         Check(shared is { Choice: StoreLocation.StoreChoice.Shared, IsShared: true, MovedHere: true, Missing: false } && shared.Folder == @"F:\aji" && shared.SharedFolder == @"F:\aji", "shared, moved");
         Check(shared.Text.Contains(@"Moved from C:\aji"), "shared, moved: " + shared.Text);
@@ -293,6 +303,22 @@ try
         Check(vm.ShowStorage && !vm.HasStorageChoice && vm.NoStorageChoice && vm.StorageIsShared && vm.AllowSharedStorageChanges, "older updater: the shared folder only");
         Fake("ok");
         Console.WriteLine("PASS which option is current");
+    }
+
+    // what a switch says it moves: the updater's bytes, else the folder's size
+    {
+        Directory.CreateDirectory(Path.Combine(insideDir, "packs"));
+        File.WriteAllBytes(Path.Combine(insideDir, "packs", "nvinfer.bin"), new byte[1234]);
+        State("inside", insideDir, installed: true);
+        await vm.RefreshStorage();
+        Check(await vm.SwitchBytes() == 1234, "no bytes: the folder's size");
+        var withBytes = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(fakeDir, "storage.json")))!.AsObject();
+        withBytes["bytes"] = 99;
+        File.WriteAllText(Path.Combine(fakeDir, "storage.json"), withBytes.ToJsonString());
+        await vm.RefreshStorage();
+        Check(await vm.SwitchBytes() == 99 && await vm.StorageBytes() == 1234, "bytes for a switch, the folder for Move...");
+        Directory.Delete(insideDir, true);
+        Console.WriteLine("PASS what a switch moves");
     }
 
     // switching through the updater

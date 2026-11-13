@@ -693,8 +693,8 @@ namespace AnimeJaNaiConfEditor.Views
             string message;
             if (storage.Installed)
             {
-                var gb = await vm.StorageBytes() / 1e9;
-                message = $"Move the TensorRT runtime ({gb:0.0} GB) from {storage.Folder} to {folder}? Nothing is downloaded again. Close the player first.";
+                var size = MainWindowViewModel.Gigabytes(await vm.SwitchBytes());
+                message = $"Move the TensorRT runtime ({size}) from {storage.Folder} to {folder}? Nothing is downloaded again. Close the player first.";
             }
             else
             {

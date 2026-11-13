@@ -40,6 +40,10 @@ namespace AnimeJaNaiConfEditor.Services
             // This copy has TensorRT in its store (only with Choice).
             public bool Installed { get; init; }
 
+            // The size of this copy's TensorRT packs in its store, which is what a switch moves (only
+            // with Choice, from an updater that says; null otherwise).
+            public long? Bytes { get; init; }
+
             public bool IsShared => Choice is null or StoreChoice.Shared;
 
             // The folder the store's files are in.
@@ -135,6 +139,7 @@ namespace AnimeJaNaiConfEditor.Services
                     Inside = Str(o, "inside"),
                     Shared = Str(o, "shared"),
                     Installed = Bool(o, "installed", false),
+                    Bytes = o.TryGetProperty("bytes", out var b) && b.ValueKind == JsonValueKind.Number && b.TryGetInt64(out var n) && n >= 0 ? n : null,
                 };
             }
             catch (Exception e) when (e is JsonException or InvalidOperationException)

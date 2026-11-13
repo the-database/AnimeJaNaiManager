@@ -553,8 +553,13 @@ namespace AnimeJaNaiConfEditor.ViewModels
             RefreshComponentAwareness();
         }
 
-        // The store's size, for the confirmations.
+        // The store's size, for the Move... / Move Back confirmations (they move the whole folder).
         public Task<long> StorageBytes() => Storage is { } s ? Task.Run(() => StoreLocation.Size(s.Folder)) : Task.FromResult(0L);
+
+        // What a switch moves: this copy's TensorRT packs (the updater's "bytes"), else the folder's size.
+        public Task<long> SwitchBytes() => Storage?.Bytes is long b ? Task.FromResult(b) : StorageBytes();
+
+        public static string Gigabytes(long bytes) => string.Format(CultureInfo.InvariantCulture, "{0:0.0} GB", bytes / 1e9);
 
         public Task MoveStorage(string folder) => ChangeStorage(["move", StoreLocation.MoveTarget(folder)], "Moving the shared runtime");
 
