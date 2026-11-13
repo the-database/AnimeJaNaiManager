@@ -45,6 +45,14 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
             RefreshComponentAwareness();
             ComponentManager.Refreshed += RefreshComponentAwareness;
+            // installing or removing TensorRT changes what Storage says (and what a switch moves)
+            ComponentManager.Refreshed += () =>
+            {
+                if (!StorageBusy)
+                {
+                    _ = RefreshStorage();
+                }
+            };
             this.WhenAnyValue(x => x.ComponentManager.IsBusy).Subscribe(_ => this.RaisePropertyChanged(nameof(AllowStorageChanges)));
             this.WhenAnyValue(x => x.ComponentManager.SetupNeeded).Subscribe(_ => this.RaisePropertyChanged(nameof(ShowSetupNeeded)));
             this.WhenAnyValue(x => x.AnimeJaNaiConf.DirectMlSelected).Subscribe(_ => RaiseGpuChoice());
@@ -141,10 +149,12 @@ namespace AnimeJaNaiConfEditor.ViewModels
             bool trtUsable = trtInstalled && nvidia != false;
             TrtSelectable = trtUsable;
 
-            // TensorRT in the shared pack store looks missing while the store's moved folder is (an
-            // unplugged drive), and until the store's location has been read. That isn't "not
-            // installed", so the backend stays as it is.
-            bool storeUnknownOrMissing = !trtInstalled && StoreLocation.UsedBy(RootDir, DataDir) && (!_storageRead || StorageMissing);
+            // TensorRT in the pack store looks missing while the store's folder is (an unplugged
+            // drive), and until the store's location has been read. That isn't "not installed", so
+            // the backend stays as it is. A copy with nothing in its store yet really is missing it.
+            bool storeUnknownOrMissing = !trtInstalled && (_storageRead ? StorageMissing : StoreLocation.UsedBy(RootDir, DataDir));
+            // whether the section shows depends on the GPU, which arrives with a component refresh
+            this.RaisePropertyChanged(nameof(ShowStorage));
 
             string notice = "";
             if (storeUnknownOrMissing)
@@ -421,10 +431,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         private const int ComponentsTabIndex = 1;
 
-        // The setup banner, unless the TensorRT packs only look missing because their folder is.
-        public bool ShowSetupNeeded => ComponentManager.SetupNeeded && !StorageMissing;
+        // The setup banner, unless the TensorRT packs only look missing because their folder is
+        // (known once storage has been read, right after the first component refresh).
+        public bool ShowSetupNeeded => ComponentManager.SetupNeeded && _storageRead && !StorageMissing;
 
-        // ---- Storage: where the shared pack store is (Components > Storage) ----------------------
+        // ---- Storage: where this copy keeps the TensorRT runtime (Components > Storage) ----------
 
         private bool _storageRead; // Storage has been set (by RefreshStorage)
         private StoreLocation.Info? _storage;
@@ -434,26 +445,82 @@ namespace AnimeJaNaiConfEditor.ViewModels
             set
             {
                 _storageRead = true;
+                bool wasMissing = StorageMissing;
                 this.RaiseAndSetIfChanged(ref _storage, value);
-                this.RaisePropertyChanged(nameof(ShowStorage));
-                this.RaisePropertyChanged(nameof(StorageFolderText));
-                this.RaisePropertyChanged(nameof(StorageMoved));
-                this.RaisePropertyChanged(nameof(StorageMissing));
-                this.RaisePropertyChanged(nameof(StorageText));
-                this.RaisePropertyChanged(nameof(StorageMissingBanner));
-                this.RaisePropertyChanged(nameof(ShowSetupNeeded));
+                RaiseStorage();
+                if (StorageMissing && !wasMissing)
+                {
+                    // the banner points here
+                    StorageSectionExpanded = true;
+                }
             }
         }
 
-        // Only where the player uses the store (StoreLocation.UsedBy) and aji-runtime can say where it is.
-        public bool ShowStorage => Storage is not null;
+        private static readonly string[] StorageProperties =
+        [
+            nameof(ShowStorage), nameof(StorageFolderText), nameof(StorageMoved), nameof(StorageMissing),
+            nameof(StorageUnavailable), nameof(StorageText), nameof(StorageMissingBanner), nameof(ShowSetupNeeded),
+            nameof(HasStorageChoice), nameof(NoStorageChoice), nameof(StorageIsInside), nameof(StorageIsShared),
+            nameof(StorageIsCustom), nameof(StorageInsideFolder), nameof(StorageSharedFolder), nameof(StorageCustomFolder),
+            nameof(StorageSharedMissing), nameof(StorageCustomMissing), nameof(AllowSharedStorageChanges), nameof(StorageSummary),
+        ];
+
+        // Also after a switch was cancelled, so the options show the current one again.
+        public void RaiseStorage()
+        {
+            foreach (var p in StorageProperties)
+            {
+                this.RaisePropertyChanged(p);
+            }
+        }
+
+        // This copy has TensorRT in its store (the updater says so, or the player was set up to load
+        // it from there).
+        public bool StorageHasTrt =>
+            Storage is { Installed: true } || File.Exists(Path.Combine(DataDir, "inference", "aji-runtime.json"));
+
+        // Where the player uses a store and TensorRT is, or can be, installed (StoreLocation.Shows).
+        public bool ShowStorage => StoreLocation.Shows(Storage, Storage is not null && StorageHasTrt, ComponentManager.GpuNvidia);
         public string StorageFolderText => Storage?.Folder ?? "";
         public bool StorageMoved => Storage?.MovedHere == true;
-        public bool StorageMissing => Storage?.Missing == true;
+
+        // The folder is unavailable and this copy's TensorRT is in it: TensorRT only looks missing.
+        public bool StorageMissing => Storage?.Missing == true && StorageHasTrt;
+        public bool StorageUnavailable => Storage?.Missing == true;
         public string StorageText => Storage?.Text ?? "";
 
-        public string StorageMissingBanner =>
-            $"The shared runtime's folder {StorageFolderText} isn't available, so TensorRT can't run. Is its drive connected? Reconnect it and click Try Again, or reset the location under Storage below.";
+        // The three options (an updater from before them only has the shared folder).
+        public bool HasStorageChoice => Storage?.Choice is not null;
+        public bool NoStorageChoice => !HasStorageChoice;
+        public bool StorageIsInside => Storage?.Choice == StoreLocation.StoreChoice.Inside;
+        public bool StorageIsShared => Storage?.IsShared == true;
+        public bool StorageIsCustom => Storage?.Choice == StoreLocation.StoreChoice.Custom;
+        public string StorageInsideFolder => Storage?.Inside ?? "";
+        public string StorageSharedFolder => Storage?.SharedFolder ?? "";
+        public string StorageCustomFolder => StorageIsCustom ? Storage!.Root : "No folder chosen";
+        public bool StorageSharedMissing => StorageIsShared && StorageUnavailable;
+        public bool StorageCustomMissing => StorageIsCustom && StorageUnavailable;
+
+        public string StorageSummary =>
+            StorageUnavailable ? "Folder not available"
+            : StorageIsInside ? "Inside this install"
+            : StorageIsCustom ? StorageFolderText
+            : HasStorageChoice ? "Shared with your other JaNai apps"
+            : StorageFolderText;
+
+        public bool StorageSectionExpanded
+        {
+            get => UiState.Current.GetExpanded("global:storage") ?? false;
+            set
+            {
+                UiState.Current.SetExpanded("global:storage", value);
+                this.RaisePropertyChanged();
+            }
+        }
+
+        public string StorageMissingBanner => StorageIsShared
+            ? $"The TensorRT runtime's folder {StorageFolderText} isn't available, so TensorRT can't run. Is its drive connected? Reconnect it and click Try Again, or reset the location under Storage below."
+            : $"The TensorRT runtime's folder {StorageFolderText} isn't available, so TensorRT can't run. Is its drive connected? Reconnect it and click Try Again, or choose another place under Storage below.";
 
         private bool _storageBusy;
         public bool StorageBusy
@@ -463,10 +530,15 @@ namespace AnimeJaNaiConfEditor.ViewModels
             {
                 this.RaiseAndSetIfChanged(ref _storageBusy, value);
                 this.RaisePropertyChanged(nameof(AllowStorageChanges));
+                this.RaisePropertyChanged(nameof(AllowSharedStorageChanges));
             }
         }
 
+        // No storage change while components install or another storage change runs.
         public bool AllowStorageChanges => !StorageBusy && ComponentManager.NotBusy;
+
+        // Move... and the others move the shared folder, so only while this copy uses it.
+        public bool AllowSharedStorageChanges => AllowStorageChanges && StorageIsShared;
 
         private string _storageStatusText = string.Empty;
         public string StorageStatusText
@@ -477,16 +549,31 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         public async Task RefreshStorage()
         {
-            Storage = StoreLocation.UsedBy(RootDir, DataDir) ? await StoreLocation.GetAsync(RootDir) : null;
+            Storage = await StoreLocation.ReadAsync(RootDir, DataDir);
             RefreshComponentAwareness();
         }
 
-        // The store's size, for the confirmations.
+        // The store's size, for the Move... / Move Back confirmations (they move the whole folder).
         public Task<long> StorageBytes() => Storage is { } s ? Task.Run(() => StoreLocation.Size(s.Folder)) : Task.FromResult(0L);
+
+        // What a switch moves: this copy's TensorRT packs (the updater's "bytes"), else the folder's size.
+        public Task<long> SwitchBytes() => Storage?.Bytes is long b ? Task.FromResult(b) : StorageBytes();
+
+        public static string Gigabytes(long bytes) => string.Format(CultureInfo.InvariantCulture, "{0:0.0} GB", bytes / 1e9);
 
         public Task MoveStorage(string folder) => ChangeStorage(["move", StoreLocation.MoveTarget(folder)], "Moving the shared runtime");
 
         public Task MoveStorageBack() => ChangeStorage(["move", "--default"], "Moving the shared runtime back");
+
+        // Switch this copy to another store ("inside", "shared" or a folder, StoreLocation.ChoiceArgument);
+        // the updater moves its TensorRT runtime along. Then the components are read again, from there.
+        public async Task<bool> SwitchStorage(string target)
+        {
+            bool installed = Storage?.Installed == true;
+            bool ok = await RunStorageChange(progress => StoreLocation.SwitchAsync(RootDir, target, progress),
+                installed ? "Moving the TensorRT runtime" : "Changing the folder", refreshComponents: true);
+            return ok;
+        }
 
         // Reset: the store's folder is gone, so the default folder starts empty, and this install's
         // TensorRT components are installed again the way first-run setup does it (the other apps
@@ -505,7 +592,12 @@ namespace AnimeJaNaiConfEditor.ViewModels
                 : "Some components weren't installed. Check them above and click Apply changes.";
         }
 
-        private async Task<bool> ChangeStorage(string[] args, string doing)
+        private Task<bool> ChangeStorage(string[] args, string doing) =>
+            RunStorageChange(progress => StoreLocation.ChangeAsync(RootDir, args, progress), doing, refreshComponents: false);
+
+        // Runs a storage change (null on success, else the error) with its progress in the status
+        // line; no component changes meanwhile.
+        private async Task<bool> RunStorageChange(Func<Action<long, long>, Task<string?>> change, string doing, bool refreshComponents)
         {
             if (!AllowStorageChanges)
             {
@@ -515,20 +607,33 @@ namespace AnimeJaNaiConfEditor.ViewModels
             ComponentManager.IsBusy = true; // no component changes meanwhile
             StorageStatusText = $"{doing}...";
             string? error;
+            bool finished = false;
             try
             {
-                error = await StoreLocation.ChangeAsync(RootDir, args, (done, total) =>
+                error = await change((done, total) =>
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        StorageStatusText = total > 0
-                            ? string.Format(CultureInfo.InvariantCulture, "{0}: {1:0.0} of {2:0.0} GB", doing, done / 1e9, total / 1e9)
-                            : $"{doing}..."));
+                    {
+                        // a last progress line can arrive after the result
+                        if (!finished)
+                        {
+                            StorageStatusText = total > 0
+                                ? string.Format(CultureInfo.InvariantCulture, "{0}: {1:0.0} of {2:0.0} GB", doing, done / 1e9, total / 1e9)
+                                : $"{doing}...";
+                        }
+                    }));
             }
             catch (Exception ex)
             {
                 error = ex.Message;
             }
+            finished = true;
             StorageStatusText = error ?? "Done.";
             ComponentManager.IsBusy = false;
+            if (refreshComponents)
+            {
+                // TensorRT is read from the new folder (still blocked: StorageBusy)
+                await ComponentManager.RefreshAsync();
+            }
             StorageBusy = false;
             await RefreshStorage();
             return error is null;
@@ -540,8 +645,10 @@ namespace AnimeJaNaiConfEditor.ViewModels
         // tab, and 3.3.0 set the bar by shipping preconfigured.
         private async Task InitializeComponentManagerAsync()
         {
-            await RefreshStorage();
+            // components first: the updater's first run picks this copy's default storage (until
+            // storage is read, a TensorRT that looks missing keeps the backend: RefreshComponentAwareness)
             await ComponentManager.RefreshAsync();
+            await RefreshStorage();
             if (StorageMissing)
             {
                 // the TensorRT packs aren't missing, their folder is: say so on the Components tab

@@ -17,10 +17,14 @@ dotnet publish -c Release        # Publish self-contained win-x64 executable
 No linter is configured. `dotnet run --project tests/ProfileRoundTrip` is a console regression
 test for conf/profile serialization (it compiles the production view-model files); it exits
 nonzero on failure. `dotnet run --project tests/RuntimePacks` checks where the "TensorRT installed"
-check looks: the shared pack store's TensorRT pack that `animejanai/inference/aji-runtime.json` names
+check looks: the pack store's TensorRT pack that `animejanai/inference/aji-runtime.json` names
 (written by the updater's store mode), else the inference folder. `dotnet run --project tests/Storage`
-covers Components > Storage (moving the shared pack store through `aji-runtime location/move/reset`);
-set `AJI_RUNTIME_EXE` to an aji-runtime 0.2.0+ build to also drive the real tool on a temporary store.
+covers Components > Storage: reading the updater's `--storage --json` (and the fallback to
+`aji-runtime location --json`), the "a folder I choose" rule, when the section shows, which option is
+current, switching through `--storage <choice>`, and the unplugged-drive handling. The test exe plays
+the updater and aji-runtime itself (`tests/Storage/FakeTools.cs`, through
+`StoreLocation.UpdaterOverride` / `AjiRuntimeOverride`); set `AJI_RUNTIME_EXE` to an aji-runtime
+0.2.0+ build to also drive the real tool on a temporary store.
 `dotnet run --project tests/TensorRtGpus` checks which NVIDIA GPUs count for TensorRT
 (`Services/TensorRtGpus.cs`): it needs compute capability 7.5+ (GeForce RTX 20 / GTX 16 series and
 newer, `TrtMinComputeCapability`). An older GPU counts as no NVIDIA GPU, so TensorRT isn't
@@ -50,6 +54,27 @@ from before that the Manager applies the rule to `gpu.sm` itself.
 **UI state:** the Manager's own layout state (sidebar width, which collapsible sections are open) lives in `manager-ui.json` next to `animejanai.conf` (`Services/UiState.cs`), never in the conf. Section keys are `profile<N>:chain<M>:<chain|activation|upscale|tfix|rife>`, `default<N>:...` and `global:trt`. The mpv package lists the file in `user_preserve`.
 
 **Layout:** profile chains (and their Activation Condition, Upscaling, Temporal Fix and RIFE blocks) and the TensorRT engine settings are `Expander.section`s with a one-line summary in the header (`ChainSummary`, `TemporalFixSummary`, `RifeSummary`, `TrtSummary`). Setting help is a `ContentControl.hint` (label + (?) icon, explanation in `ToolTip.Tip`), not visible text. The profiles sidebar is resizable (`GridSplitter`) and collapses to icons below 120 px (`compact` class).
+
+**Storage (Components > Storage, `Services/StoreLocation.cs`):** where this copy keeps the TensorRT
+runtime and its GPU kernels (its pack store). The updater (run in the install root) owns the choice:
+`AnimeJaNaiUpdater --storage --json` prints `{"choice": "inside"|"shared"|"custom", "root", "moved",
+"target", "available", "inside", "shared", "installed", "bytes"}` (`bytes`: this copy's TensorRT
+packs, what a switch moves; the confirmation falls back to the folder's size without it), and `--storage inside|shared|<folder>`
+switches and moves the packs (`AJI_MOVE <copied> <total>` progress lines; on failure a non-zero exit
+with the reason as the last output line). The section offers the three options (inside this install,
+shared with the other JaNai apps, a folder the user picks: a folder that already is a store, with
+`store.json`, is used as is so apps share it; a new or empty folder as is; else
+`<folder>\JaNai shared runtime`). Move... / Move Back to Default / Try Again / Reset to Default
+(`aji-runtime move/move --default/reset`) move the shared folder itself and are enabled only while
+this copy uses it. An updater without `--storage` (non-zero exit or other output) gets the old
+section: only the shared folder, through `aji-runtime location --json`, and only once TensorRT is in it
+(`inference/aji-runtime.json`). The section shows when aji-runtime is at the install root, the store
+could be read, and TensorRT is installed here or the PC has a TensorRT-capable NVIDIA GPU
+(`StoreLocation.Shows`); hidden for dev builds and a Manager without the updater. While the folder is
+unavailable (`available: false`) and this copy has TensorRT in it, TensorRT only looks missing: the
+backend stays, the setup banner gives way to the missing-folder banner (`StorageMissing`). Storage is
+read after the component refresh (the updater's first run picks this copy's default) and after
+every component refresh.
 
 **Relative paths from executable:** The app resolves paths relative to its own location — `./animejanai.conf`, `./onnx/`, `./backups/`, and `../portable_config/mpv.conf` for mpv integration.
 
