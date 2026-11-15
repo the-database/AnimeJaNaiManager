@@ -55,6 +55,36 @@ try
         Console.WriteLine("PASS hand-written reuse_held_frames values read like libaji");
     }
 
+    // Native kernels: [global] native, on when absent (the fixture has no key).
+    {
+        if (!vm.AnimeJaNaiConf.UseNativeKernels)
+            throw new Exception("Native kernels must default to on when the key is absent");
+        string Text(string conf) => File.ReadAllText(conf).Replace("\r", "");
+        foreach (bool native in new[] { false, true })
+        {
+            vm.AnimeJaNaiConf.UseNativeKernels = native;
+            string full = Path.Combine(data, $"native-{native}.conf");
+            vm.WriteAnimeJaNaiConf(full);
+            if (!Text(full).Contains($"native={(native ? "on" : "off")}\n"))
+                throw new Exception($"Full config lacks native={native}:\n{Text(full)}");
+            if (vm.ReadAnimeJaNaiConf(full).UseNativeKernels != native)
+                throw new Exception($"Full config lost native={native}");
+            if (vm.ReadAnimeJaNaiConf(Path.Combine(data, "animejanai.conf")).UseNativeKernels != native)
+                throw new Exception($"Autosave lost native={native}");
+            Console.WriteLine($"PASS native={native} export/reload and autosave");
+        }
+        // Hand-edited values read as libaji reads them: only off/no turn it off.
+        foreach (var (value, expected) in new[] { ("off", false), (" NO ", false), ("on", true), ("yes", true),
+                                                   ("auto", true), ("", true) })
+        {
+            string handConf = Path.Combine(data, "native-hand.conf");
+            File.WriteAllText(handConf, $"[global]\nconfig_version=3\nnative={value}\n");
+            if (vm.ReadAnimeJaNaiConf(handConf).UseNativeKernels != expected)
+                throw new Exception($"native={value} must read as {(expected ? "on" : "off")}");
+        }
+        Console.WriteLine("PASS hand-written native values read like libaji");
+    }
+
     // GPU choice: gpu_tensorrt / gpu_directml, written only when a GPU is chosen.
     {
         string Text(string conf) => File.ReadAllText(conf).Replace("\r", "");
