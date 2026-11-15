@@ -1268,6 +1268,7 @@ chain_2_rife=no";
             animeJaNaiConf.EnableLogging = ParseBool(parser.GetValue("global", "logging", "no"));
             animeJaNaiConf.AutoDisplayRefresh = ParseBool(parser.GetValue("global", "display_rate_match", "no"));
             animeJaNaiConf.BackendAutoFallback = ParseBool(parser.GetValue("global", "backend_auto_fallback", "no"));
+            animeJaNaiConf.ReuseHeldFrames = ParseReuseHeldFrames(parser.GetValue("global", "reuse_held_frames", ""));
             if (Enum.TryParse(parser.GetValue("global", "backend", "TensorRT"), out Backend backend))
             {
                 switch (backend)
@@ -1494,6 +1495,14 @@ chain_2_rife=no";
             return value?.ToLower() == "yes";
         }
 
+        // [global] reuse_held_frames, read as libaji's aji_reuse_held_frames_for_config reads it:
+        // on unless it says no/off/false/0, so an absent key (every conf before this setting) is on.
+        public static bool ParseReuseHeldFrames(string? value)
+        {
+            var v = (value ?? "").Trim().ToLowerInvariant();
+            return !(v == "no" || v == "off" || v == "false" || v == "0");
+        }
+
         // One chain_N_model_M_* key: reads that model once.
         private void ReadModelKey(ConfigParser parser, string section, string keyName, string chainNumber,
             Dictionary<string, Dictionary<string, UpscaleModel>> models, bool autoSave)
@@ -1596,6 +1605,8 @@ chain_2_rife=no";
             parser.SetValue("global", "backend", conf.SelectedBackend.ToString());
             parser.SetValue("global", "backend_auto_fallback", conf.BackendAutoFallback ? "yes" : "no");
             parser.SetValue("global", "logging", conf.EnableLogging ? "yes" : "no");
+            // Read by the mpv filter through libaji (aji_reuse_held_frames_for_config); absent => on.
+            parser.SetValue("global", "reuse_held_frames", conf.ReuseHeldFrames ? "yes" : "no");
             // Write-minimal: only persist default_slot when the user picked one (absent => the vf
             // line's baked-in Balanced slot applies).
             if (conf.DefaultSlot is int defaultSlot)
@@ -1911,7 +1922,8 @@ chain_2_rife=no";
 
                 this.WhenAnyValue(
                     x => x.GpuTensorRt,
-                    x => x.GpuDirectMl).Subscribe(x =>
+                    x => x.GpuDirectMl,
+                    x => x.ReuseHeldFrames).Subscribe(x =>
                     {
                         Vm?.WriteAnimeJaNaiConf();
                     });
@@ -2221,6 +2233,17 @@ chain_2_rife=no";
         {
             get => _autoDisplayRefresh;
             set => this.RaiseAndSetIfChanged(ref _autoDisplayRefresh, value);
+        }
+
+        // Held-frame reuse ([global] reuse_held_frames): a frame that is the same picture as the
+        // last upscaled one gets that upscale again instead of running the model. On by default;
+        // the mpv filter reads the key through libaji, and benchmarks never reuse.
+        private bool _reuseHeldFrames = true;
+        [DataMember]
+        public bool ReuseHeldFrames
+        {
+            get => _reuseHeldFrames;
+            set => this.RaiseAndSetIfChanged(ref _reuseHeldFrames, value);
         }
     }
 
