@@ -48,5 +48,27 @@ Check(r.Nvidia && r.TooOld.Count == 0 && TensorRtGpus.GpuText(r, true) == "GPU: 
 r = Read("""{"gpu":{"nvidia":false,"sm":"","name":""},"packs":[]}""");
 Check(!r.Nvidia && r.TooOld.Count == 0 && TensorRtGpus.GpuText(r, true).Contains("no NVIDIA device"), "no NVIDIA GPU");
 
+// the JSON line and the notes: an updater from before `notes` printed a message ahead of the JSON
+const string Old = "This release's component packs are unavailable (404); RIFE can't be installed.\r\n" +
+                   """{"gpu":{"nvidia":false,"sm":"","name":""},"packs":[]}""" + "\r\n";
+var json = TensorRtGpus.ComponentsJson(Old);
+Check(json == """{"gpu":{"nvidia":false,"sm":"","name":""},"packs":[]}""", "the JSON line after a message");
+using (var doc = JsonDocument.Parse(json!))
+{
+    Check(TensorRtGpus.Notes(doc.RootElement, Old).SequenceEqual(["This release's component packs are unavailable (404); RIFE can't be installed."]),
+        "an older updater's message is a note");
+}
+const string New = """{"gpu":{"nvidia":false,"sm":"","name":""},"packs":[],"notes":["Couldn't set this copy's runtime folder; it uses the shared one."]}""" + "\n";
+using (var doc = JsonDocument.Parse(TensorRtGpus.ComponentsJson(New)!))
+{
+    Check(TensorRtGpus.Notes(doc.RootElement, New).SequenceEqual(["Couldn't set this copy's runtime folder; it uses the shared one."]),
+        "the updater's notes");
+}
+using (var doc = JsonDocument.Parse("""{"packs":[],"notes":[]}"""))
+{
+    Check(TensorRtGpus.Notes(doc.RootElement, """{"packs":[],"notes":[]}""").Count == 0, "no notes");
+}
+Check(TensorRtGpus.ComponentsJson("Updater error: boom\n") == null, "no JSON line");
+
 Console.WriteLine(failures == 0 ? "tensorrt gpu tests passed" : $"{failures} failed");
 return failures == 0 ? 0 : 1;

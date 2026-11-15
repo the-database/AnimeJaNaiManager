@@ -23,6 +23,24 @@ namespace AnimeJaNaiConfEditor.Services
         // it, which counted every NVIDIA GPU.
         public static readonly (int Major, int Minor) TrtMinComputeCapability = (7, 5);
 
+        // The JSON object in the updater's `--components --json` output: its last line that starts
+        // with '{'. An updater from before `notes` printed messages such as "This release's
+        // component packs are unavailable (...)" on stdout ahead of it; null when there is none.
+        public static string? ComponentsJson(string output) =>
+            output.Split('\n', StringSplitOptions.TrimEntries).LastOrDefault(l => l.StartsWith('{'));
+
+        // What the updater said while gathering the report (its `notes`, else the lines an older
+        // updater printed ahead of the JSON), one message each.
+        public static IReadOnlyList<string> Notes(JsonElement root, string output)
+        {
+            if (root.TryGetProperty("notes", out var n) && n.ValueKind == JsonValueKind.Array)
+            {
+                return [.. n.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => s.Length > 0)];
+            }
+            return [.. output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                             .Where(l => !l.StartsWith('{'))];
+        }
+
         public static bool Capable(int major, int minor) =>
             major > TrtMinComputeCapability.Major ||
             (major == TrtMinComputeCapability.Major && minor >= TrtMinComputeCapability.Minor);

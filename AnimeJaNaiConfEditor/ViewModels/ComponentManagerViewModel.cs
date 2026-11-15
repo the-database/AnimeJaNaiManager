@@ -159,8 +159,10 @@ namespace AnimeJaNaiConfEditor.ViewModels
                     throw new InvalidOperationException(output.Trim());
                 }
 
-                using var doc = JsonDocument.Parse(output);
+                using var doc = JsonDocument.Parse(Services.TensorRtGpus.ComponentsJson(output)
+                    ?? throw new InvalidOperationException(LastLine(output)));
                 var root = doc.RootElement;
+                var notes = Services.TensorRtGpus.Notes(root, output);
                 var report = Services.TensorRtGpus.Read(root);
                 GpuText = Services.TensorRtGpus.GpuText(report, OperatingSystem.IsWindows());
                 GpuNvidia = report.Nvidia;
@@ -202,7 +204,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
                     ? mm.GetString() : null;
                 StatusLine = mismatch is not null
                     ? mismatch + " Update first, then manage components."
-                    : "";
+                    : string.Join(" ", notes);
                 LoadFailed = false;
             }
             catch (Exception ex)
