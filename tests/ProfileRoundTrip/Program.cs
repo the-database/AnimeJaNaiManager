@@ -25,6 +25,36 @@ try
             throw new Exception($"Autosave lost automatic display refresh={enabled}");
         Console.WriteLine($"PASS automatic display refresh={enabled} export/reload and autosave");
     }
+    // Held-frame reuse: [global] reuse_held_frames, on when absent (the fixture has no key).
+    {
+        if (!vm.AnimeJaNaiConf.ReuseHeldFrames)
+            throw new Exception("Reusing held frames must default to on when the key is absent");
+        string Text(string conf) => File.ReadAllText(conf).Replace("\r", "");
+        foreach (bool reuse in new[] { false, true })
+        {
+            vm.AnimeJaNaiConf.ReuseHeldFrames = reuse;
+            string full = Path.Combine(data, $"reuse-held-{reuse}.conf");
+            vm.WriteAnimeJaNaiConf(full);
+            if (!Text(full).Contains($"reuse_held_frames={(reuse ? "yes" : "no")}\n"))
+                throw new Exception($"Full config lacks reuse_held_frames={reuse}:\n{Text(full)}");
+            if (vm.ReadAnimeJaNaiConf(full).ReuseHeldFrames != reuse)
+                throw new Exception($"Full config lost reuse held frames={reuse}");
+            if (vm.ReadAnimeJaNaiConf(Path.Combine(data, "animejanai.conf")).ReuseHeldFrames != reuse)
+                throw new Exception($"Autosave lost reuse held frames={reuse}");
+            Console.WriteLine($"PASS reuse held frames={reuse} export/reload and autosave");
+        }
+        // Hand-edited values read as libaji reads them: only no/off/false/0 turn it off.
+        foreach (var (value, expected) in new[] { ("no", false), ("off", false), (" FALSE ", false), ("0", false),
+                                                   ("yes", true), ("on", true), ("auto", true), ("", true) })
+        {
+            string handConf = Path.Combine(data, "reuse-held-hand.conf");
+            File.WriteAllText(handConf, $"[global]\nconfig_version=3\nreuse_held_frames={value}\n");
+            if (vm.ReadAnimeJaNaiConf(handConf).ReuseHeldFrames != expected)
+                throw new Exception($"reuse_held_frames={value} must read as {(expected ? "on" : "off")}");
+        }
+        Console.WriteLine("PASS hand-written reuse_held_frames values read like libaji");
+    }
+
     // GPU choice: gpu_tensorrt / gpu_directml, written only when a GPU is chosen.
     {
         string Text(string conf) => File.ReadAllText(conf).Replace("\r", "");

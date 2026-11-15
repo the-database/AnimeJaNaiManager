@@ -389,6 +389,10 @@
               </StackPanel>
             </Expander>
 
+            <ContentControl Classes="hint" ToolTip.Tip="Frames that don't change (held drawings, still shots) reuse the previous frame's upscale instead of being upscaled again, which lowers GPU load. The picture looks the same. Not used with RIFE interpolation, temporal fix or other temporal models. On by default; restart the player after changing this setting.">
+              <CheckBox IsChecked="{Binding AnimeJaNaiConf.ReuseHeldFrames}" Content="Reuse upscales of unchanged frames" />
+            </ContentControl>
+
             <ContentControl Classes="hint">
               <ToolTip.Tip>
                 <StackPanel Spacing="6">
