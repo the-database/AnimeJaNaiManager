@@ -1269,6 +1269,7 @@ chain_2_rife=no";
             animeJaNaiConf.AutoDisplayRefresh = ParseBool(parser.GetValue("global", "display_rate_match", "no"));
             animeJaNaiConf.BackendAutoFallback = ParseBool(parser.GetValue("global", "backend_auto_fallback", "no"));
             animeJaNaiConf.ReuseHeldFrames = ParseReuseHeldFrames(parser.GetValue("global", "reuse_held_frames", ""));
+            animeJaNaiConf.UseNativeKernels = ParseNative(parser.GetValue("global", "native", ""));
             if (Enum.TryParse(parser.GetValue("global", "backend", "TensorRT"), out Backend backend))
             {
                 switch (backend)
@@ -1503,6 +1504,14 @@ chain_2_rife=no";
             return !(v == "no" || v == "off" || v == "false" || v == "0");
         }
 
+        // [global] native, read as libaji's conf parser reads it: native unless it says off/no, so an
+        // absent key (every conf before this setting) is on.
+        public static bool ParseNative(string? value)
+        {
+            var v = (value ?? "").Trim().ToLowerInvariant();
+            return !(v == "off" || v == "no");
+        }
+
         // One chain_N_model_M_* key: reads that model once.
         private void ReadModelKey(ConfigParser parser, string section, string keyName, string chainNumber,
             Dictionary<string, Dictionary<string, UpscaleModel>> models, bool autoSave)
@@ -1607,6 +1616,8 @@ chain_2_rife=no";
             parser.SetValue("global", "logging", conf.EnableLogging ? "yes" : "no");
             // Read by the mpv filter through libaji (aji_reuse_held_frames_for_config); absent => on.
             parser.SetValue("global", "reuse_held_frames", conf.ReuseHeldFrames ? "yes" : "no");
+            // Read by libaji (TensorRT and TensorRT-RTX backends); absent => on.
+            parser.SetValue("global", "native", conf.UseNativeKernels ? "on" : "off");
             // Write-minimal: only persist default_slot when the user picked one (absent => the vf
             // line's baked-in Balanced slot applies).
             if (conf.DefaultSlot is int defaultSlot)
@@ -1923,7 +1934,8 @@ chain_2_rife=no";
                 this.WhenAnyValue(
                     x => x.GpuTensorRt,
                     x => x.GpuDirectMl,
-                    x => x.ReuseHeldFrames).Subscribe(x =>
+                    x => x.ReuseHeldFrames,
+                    x => x.UseNativeKernels).Subscribe(x =>
                     {
                         Vm?.WriteAnimeJaNaiConf();
                     });
@@ -2244,6 +2256,17 @@ chain_2_rife=no";
         {
             get => _reuseHeldFrames;
             set => this.RaiseAndSetIfChanged(ref _reuseHeldFrames, value);
+        }
+
+        // Native kernels ([global] native=on|off): libaji runs the models it has kernels for on its
+        // own CUDA kernels (RTX 30 and newer) instead of building TensorRT engines. On by default;
+        // off makes every model use TensorRT. DirectML ignores it.
+        private bool _useNativeKernels = true;
+        [DataMember]
+        public bool UseNativeKernels
+        {
+            get => _useNativeKernels;
+            set => this.RaiseAndSetIfChanged(ref _useNativeKernels, value);
         }
     }
 

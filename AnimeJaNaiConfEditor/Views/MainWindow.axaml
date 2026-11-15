@@ -393,6 +393,10 @@
               <CheckBox IsChecked="{Binding AnimeJaNaiConf.ReuseHeldFrames}" Content="Reuse upscales of unchanged frames" />
             </ContentControl>
 
+            <ContentControl Classes="hint" ToolTip.Tip="On RTX 30 and newer GPUs, models run on built-in GPU kernels instead of TensorRT engines: faster, and a new profile plays without waiting for an engine to build. Turn this off to use TensorRT for every model, for example if a model looks wrong or fails to play. Applies to the TensorRT and TensorRT-RTX backends. On by default; restart the player after changing this setting.">
+              <CheckBox IsChecked="{Binding AnimeJaNaiConf.UseNativeKernels}" Content="Use native GPU kernels" />
+            </ContentControl>
+
             <ContentControl Classes="hint">
               <ToolTip.Tip>
                 <StackPanel Spacing="6">

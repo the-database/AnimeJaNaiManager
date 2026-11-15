@@ -48,6 +48,8 @@ from before that the Manager applies the rule to `gpu.sm` itself.
 
 **Held-frame reuse:** `[global] reuse_held_frames=yes|no` (Global Settings, "Reuse upscales of unchanged frames"), on when absent. The mpv filter reads it through libaji (`aji_reuse_held_frames_for_config`, 0.30.0+), which treats only no/off/false/0 as off; `ParseReuseHeldFrames` mirrors that. Benchmarks pass `reuse-held=no` on the vf line themselves.
 
+**Native kernels:** `[global] native=on|off` (Global Settings, "Use native GPU kernels"), on when absent. libaji (0.29.0+) reads it on the TensorRT and TensorRT-RTX backends and treats only off/no as off; `ParseNative` mirrors that. Off runs every model on TensorRT engines.
+
 **Chain feature keys (need aji v0.17.0+, which ships in the same mpv package):**
 - `chain_N_upscale=no`: the engine skips the chain's models; they stay under `chain_N_model_M_*` so turning upscaling back on restores them.
 - `chain_N_temporal_fix_model` + `chain_N_temporal_fix_scene_threshold`: the engine runs that vs_temporalfix model after the upscale models (or alone). The Manager picks the file, the newest `temporalfix_s<k>_v*` in `onnx/`, and reads the strength back from the name.
