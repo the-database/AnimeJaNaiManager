@@ -18,6 +18,11 @@ public sealed class BenchmarkMeasurement
     [JsonPropertyName("display_hz")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? DisplayHz { get; set; }
+    // TensorRT backend only (runner from 3.12.2): true when every sample ran on libaji's native GPU
+    // kernels, false when every sample ran a TensorRT engine; absent when unknown or mixed.
+    [JsonPropertyName("native_kernels")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? NativeKernels { get; set; }
 
     public void Validate()
     {
@@ -36,4 +41,12 @@ public sealed class BenchmarkMeasurement
     public string Description => Mode == "native-display"
         ? $"Native-display rendering at {OutputResolution}" + (DisplayHz is double hz ? $" ({hz:0.##} Hz)" : "")
         : "Decode + upscale throughput (no display rendering)";
+
+    [JsonIgnore]
+    public string? EngineDescription => NativeKernels switch
+    {
+        true => "Native GPU kernels",
+        false => "TensorRT engines",
+        null => null,
+    };
 }

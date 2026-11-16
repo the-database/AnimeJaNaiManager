@@ -379,8 +379,9 @@ namespace AnimeJaNaiConfEditor.Views
                         "for the catalog. Audio, subtitles, and presentation sync are disabled.\n\n" +
                         "mpv windows will open and close on their own. Leave them visible; do not " +
                         "resize, minimize, pause, or close them while the benchmark runs.\n\n" +
-                        "The first run builds a TensorRT engine per resolution (about a minute " +
-                        "each, cached afterward), so the whole benchmark can take 10+ minutes depending on your hardware.",
+                        "On NVIDIA RTX 30 and newer the models run on native GPU kernels, with nothing to build. " +
+                        "Otherwise the first run builds a TensorRT engine per resolution (about a minute each, " +
+                        "cached afterward), so the whole benchmark can take 10+ minutes depending on your hardware.",
                 },
                 Buttons =
                 {
@@ -492,7 +493,8 @@ namespace AnimeJaNaiConfEditor.Views
             panel.Children.Add(new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
-                Text = sub.Measurement?.Description ?? "Legacy benchmark: measurement method and output display are unknown.",
+                Text = (sub.Measurement?.Description ?? "Legacy benchmark: measurement method and output display are unknown.") +
+                    (sub.Measurement?.EngineDescription is string engine ? $" · {engine}" : ""),
                 Margin = new Thickness(0, 0, 0, 6),
             });
             panel.Children.Add(preview);

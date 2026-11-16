@@ -36,6 +36,22 @@ try
     var pipeline = BenchmarkSubmission.FromBenchmarkFile(file);
     Check(pipeline.Measurement!.OutputResolution == null && pipeline.Schema == 2, "Pipeline has no display target.");
 
+    // native_kernels (runner from 3.12.2) is forwarded for TensorRT and shown in the preview.
+    foreach (bool nativeKernels in new[] { true, false })
+    {
+        File.WriteAllText(file, title + header($$"""{"method":"mpv-output-trace-v2","mode":"pipeline","native_kernels":{{(nativeKernels ? "true" : "false")}}}""") + table);
+        var sub = BenchmarkSubmission.FromBenchmarkFile(file);
+        Check(sub.Measurement!.NativeKernels == nativeKernels, "Read native_kernels.");
+        using var json = JsonDocument.Parse(sub.ToPreviewJson());
+        Check(json.RootElement.GetProperty("measurement").GetProperty("native_kernels").GetBoolean() == nativeKernels,
+            "Send native_kernels with the measurement.");
+        Check(sub.Measurement.EngineDescription == (nativeKernels ? "Native GPU kernels" : "TensorRT engines"), "Describe the engine.");
+    }
+    using (var older = JsonDocument.Parse(pipeline.ToPreviewJson()))
+        Check(!older.RootElement.GetProperty("measurement").TryGetProperty("native_kernels", out _), "Older runners send no native_kernels.");
+    File.WriteAllText(file, "AnimeJaNai benchmark v2 - backend: DirectML\n" + header("""{"method":"mpv-output-trace-v2","mode":"pipeline","native_kernels":true}""") + table);
+    Check(BenchmarkSubmission.FromBenchmarkFile(file).Measurement!.NativeKernels == null, "native_kernels only applies to TensorRT.");
+
     File.WriteAllText(file, "AnimeJaNai playback benchmark - backend: TensorRT\n" + table);
     var legacy = BenchmarkSubmission.FromBenchmarkFile(file);
     Check(legacy.Schema == 1 && legacy.Measurement == null, "Legacy must not inherit current screen or stale metadata.");

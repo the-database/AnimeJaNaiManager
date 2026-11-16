@@ -150,6 +150,9 @@ namespace AnimeJaNaiConfEditor.Services
             }
             if (v2 && sub.Measurement == null)
                 throw new InvalidDataException("The v2 benchmark is missing its measurement metadata. Rerun the benchmark.");
+            // Native GPU kernels only exist on the TensorRT backend; the catalog refuses the flag elsewhere.
+            if (sub.Measurement != null && !sub.Backend.Equals("TensorRT", StringComparison.OrdinalIgnoreCase))
+                sub.Measurement.NativeKernels = null;
             return sub;
         }
 
