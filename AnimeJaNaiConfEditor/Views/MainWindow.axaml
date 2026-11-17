@@ -806,7 +806,8 @@
           <Button Content="Apply changes" Command="{Binding ComponentManager.Apply}" IsEnabled="{Binding ComponentManager.NotBusy}" Classes="active"/>
           <Button Content="Refresh" Command="{Binding ComponentManager.Refresh}" IsEnabled="{Binding ComponentManager.NotBusy}"/>
         </StackPanel>
-        <TextBlock Text="{Binding ComponentManager.StatusLine}" TextWrapping="Wrap" Opacity="0.7"/>
+        <TextBlock Text="{Binding ComponentManager.StatusLine}" TextWrapping="Wrap" Opacity="0.7" IsVisible="{Binding ComponentManager.StatusIsInfo}"/>
+        <TextBlock Text="{Binding ComponentManager.StatusLine}" TextWrapping="Wrap" Foreground="Orange" FontWeight="SemiBold" IsVisible="{Binding ComponentManager.StatusIsError}"/>
 
         <!-- Storage: where this copy keeps the TensorRT runtime. Three options with an updater that
              has them (inside this install, the shared folder, a folder the user picks); before that

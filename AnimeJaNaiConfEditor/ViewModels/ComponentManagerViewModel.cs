@@ -69,8 +69,8 @@ namespace AnimeJaNaiConfEditor.ViewModels
     // owns all pack logic (release lookup, NVML GPU detection, components.json bookkeeping).
     public class ComponentManagerViewModel : ViewModelBase
     {
-        // The Linux package ships the updater without an extension.
-        public static string UpdaterPath { get; } = Path.Combine(MainWindowViewModel.RootDir,
+        // The Linux package ships the updater without an extension. Settable for tests.
+        public static string UpdaterPath { get; set; } = Path.Combine(MainWindowViewModel.RootDir,
             OperatingSystem.IsWindows() ? "AnimeJaNaiUpdater.exe" : "AnimeJaNaiUpdater");
 
         public bool UpdaterFound => File.Exists(UpdaterPath);
@@ -111,6 +111,20 @@ namespace AnimeJaNaiConfEditor.ViewModels
             set => this.RaiseAndSetIfChanged(ref _statusLine, value);
         }
 
+        // The status line is a failure to act on (shown in the warning color), not progress.
+        private bool _statusIsError;
+        public bool StatusIsError
+        {
+            get => _statusIsError;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _statusIsError, value);
+                this.RaisePropertyChanged(nameof(StatusIsInfo));
+            }
+        }
+
+        public bool StatusIsInfo => !StatusIsError;
+
         private bool _setupNeeded;
         public bool SetupNeeded
         {
@@ -139,8 +153,9 @@ namespace AnimeJaNaiConfEditor.ViewModels
         }
 
         // Populates the pack list. Recommended-but-missing packs come back pre-checked, so
-        // first-time setup is "uncheck what you don't want, click Apply".
-        public async Task RefreshAsync()
+        // first-time setup is "uncheck what you don't want, click Apply". keepStatus: leave a
+        // failure from the change that just ran on screen instead of replacing it.
+        public async Task RefreshAsync(bool keepStatus = false)
         {
             if (!UpdaterFound)
             {
@@ -150,7 +165,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
             }
 
             IsBusy = true;
-            StatusLine = "Checking installed components...";
+            if (!keepStatus)
+            {
+                StatusIsError = false;
+                StatusLine = "Checking installed components...";
+            }
             try
             {
                 var (exitCode, output) = await RunUpdaterAsync("--components --json", null);
@@ -202,15 +221,19 @@ namespace AnimeJaNaiConfEditor.ViewModels
                 SetupNeeded = Packs.Any(p => p.Recommended && !p.Installed);
                 string? mismatch = root.TryGetProperty("version_mismatch", out var mm)
                     ? mm.GetString() : null;
-                StatusLine = mismatch is not null
-                    ? mismatch + " Update first, then manage components."
-                    : string.Join(" ", notes);
+                if (!keepStatus)
+                {
+                    StatusLine = mismatch is not null
+                        ? mismatch + " Update first, then manage components."
+                        : string.Join(" ", notes);
+                }
                 LoadFailed = false;
             }
             catch (Exception ex)
             {
                 GpuText = "Could not load component information.";
                 StatusLine = ex.Message;
+                StatusIsError = true;
                 LoadFailed = true;
             }
             finally
@@ -252,25 +275,27 @@ namespace AnimeJaNaiConfEditor.ViewModels
             }
 
             IsBusy = true;
+            StatusIsError = false;
+            bool failed = false;
             try
             {
                 foreach (var name in toInstall)
                 {
                     var (exitCode, output) = await RunUpdaterAsync($"--install {name}",
-                        line => StatusLine = $"{name}: {line}");
+                        line => StatusLine = $"{TitleOf(name)}: {line}");
                     if (exitCode != 0)
                     {
-                        StatusLine = $"Installing {name} failed: {LastLine(output)}";
+                        Fail($"Installing {TitleOf(name)} failed. {FailureText(output)}");
                         return;
                     }
                 }
                 foreach (var name in toRemove)
                 {
-                    StatusLine = $"Removing {name}...";
+                    StatusLine = $"Removing {TitleOf(name)}...";
                     var (exitCode, output) = await RunUpdaterAsync($"--remove {name}", null);
                     if (exitCode != 0)
                     {
-                        StatusLine = $"Removing {name} failed: {LastLine(output)}";
+                        Fail($"Removing {TitleOf(name)} failed. {FailureText(output)}");
                         return;
                     }
                 }
@@ -279,13 +304,35 @@ namespace AnimeJaNaiConfEditor.ViewModels
             finally
             {
                 IsBusy = false;
-                await RefreshAsync();
+                await RefreshAsync(keepStatus: failed);
+            }
+
+            void Fail(string text)
+            {
+                StatusLine = text;
+                StatusIsError = true;
+                failed = true;
             }
         }
 
         public async void Refresh()
         {
             await RefreshAsync();
+        }
+
+        private string TitleOf(string name) => Packs.FirstOrDefault(p => p.Name == name)?.Title ?? name;
+
+        // What went wrong, from the updater's output: its error line without the "Updater error:"
+        // prefix, plus what it said after it (what to do next), else its last line.
+        private static string FailureText(string output)
+        {
+            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            int error = Array.FindLastIndex(lines, l => l.StartsWith("Updater error: ", StringComparison.Ordinal));
+            if (error < 0)
+            {
+                return LastLine(output);
+            }
+            return string.Join(" ", lines.Skip(error).Select((l, i) => i == 0 ? l["Updater error: ".Length..] : l));
         }
 
         private static string LastLine(string s) =>

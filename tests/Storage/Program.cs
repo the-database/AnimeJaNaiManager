@@ -355,6 +355,40 @@ try
         Console.WriteLine("PASS switching through the updater");
     }
 
+    // Components: a failed install says what went wrong and what to do, in the warning color, and
+    // the list refresh that follows doesn't wipe it.
+    {
+        string savedUpdater = ComponentManagerViewModel.UpdaterPath;
+        ComponentManagerViewModel.UpdaterPath = self;
+        File.WriteAllText(Path.Combine(fakeDir, "components.json"), JsonSerializer.Serialize(new
+        {
+            package_version = "3.12.3", version_mismatch = (string?)null,
+            gpu = new { nvidia = false, sm = "", name = "" }, gpus = Array.Empty<object>(), unsupported_gpus = Array.Empty<object>(),
+            packs = new[] { new { name = "rife", bytes = 462444571L, installed = false, recommended = false, preselect = true } },
+            notes = Array.Empty<string>(),
+        }));
+        File.WriteAllText(Path.Combine(fakeDir, "install.txt"), string.Join("\n",
+            "Downloading component-rife.7z...",
+            "Updater error: Close the player and try again: it is using rife_v4.10.onnx, which this change replaces. You can keep Manager open.",
+            "The change didn't finish and addons are paused until it's undone: close the player, then click Apply changes in AnimeJaNai Manager > Components again (or run AnimeJaNaiUpdater --recover)."));
+        File.WriteAllText(Path.Combine(fakeDir, "install-exit.txt"), "1");
+        var components = new ComponentManagerViewModel();
+        await components.RefreshAsync();
+        Check(components.Packs.Count == 1 && !components.StatusIsError, "components: listed");
+        await components.InstallMissingPreselectedAsync();
+        Check(components.StatusIsError && !components.IsBusy, "components: a failure is shown as one");
+        Check(components.StatusLine == "Installing RIFE interpolation models failed. Close the player and try again: it is using rife_v4.10.onnx, " +
+            "which this change replaces. You can keep Manager open. The change didn't finish and addons are paused until it's undone: close the player, " +
+            "then click Apply changes in AnimeJaNai Manager > Components again (or run AnimeJaNaiUpdater --recover).",
+            "components: the failure survives the refresh: " + components.StatusLine);
+        File.WriteAllText(Path.Combine(fakeDir, "install.txt"), "rife installed.");
+        File.WriteAllText(Path.Combine(fakeDir, "install-exit.txt"), "0");
+        await components.InstallMissingPreselectedAsync();
+        Check(!components.StatusIsError && components.StatusLine == "", "components: success clears it: " + components.StatusLine);
+        ComponentManagerViewModel.UpdaterPath = savedUpdater;
+        Console.WriteLine("PASS a failed component change stays on screen");
+    }
+
     // back to the state the integration test below expects: no updater, aji-runtime.json in place
     StoreLocation.UpdaterOverride = null;
     StoreLocation.AjiRuntimeOverride = fakeTool;
