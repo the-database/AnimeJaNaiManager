@@ -7,12 +7,15 @@ using System.Text.Json.Nodes;
 // updater without --storage does), "garbage" (prints something else) or "fail" (a switch fails);
 // location.json is what `location --json` prints; each call's working directory and arguments are
 // appended to calls.txt ("<cwd>\x1e<arg>\x1f<arg>...").
+// It also plays the updater's component commands: `--components --json` prints components.json from
+// that folder, and `--install <pack>` / `--remove <pack>` print install.txt and exit with the number
+// in install-exit.txt (0 without it).
 static class FakeTools
 {
     public static int? Run(string[] args)
     {
         if (Environment.GetEnvironmentVariable("AJM_FAKE_DIR") is not { Length: > 0 } dir ||
-            args.Length == 0 || args[0] is not ("--storage" or "location"))
+            args.Length == 0 || args[0] is not ("--storage" or "location" or "--components" or "--install" or "--remove"))
         {
             return null;
         }
@@ -27,6 +30,16 @@ static class FakeTools
         {
             stdout.WriteLine(Read("location.json"));
             return 0;
+        }
+        if (args[0] == "--components")
+        {
+            stdout.WriteLine(Read("components.json"));
+            return 0;
+        }
+        if (args[0] is "--install" or "--remove")
+        {
+            stdout.WriteLine(Read("install.txt"));
+            return int.TryParse(Read("install-exit.txt"), out int code) ? code : 0;
         }
 
         string mode = Read("mode.txt");
