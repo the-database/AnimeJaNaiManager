@@ -25,6 +25,27 @@ try
             throw new Exception($"Autosave lost automatic display refresh={enabled}");
         Console.WriteLine($"PASS automatic display refresh={enabled} export/reload and autosave");
     }
+    // The backend: each choice writes [global] backend= and reads back as itself (Vulkan: libaji's
+    // aji_vk, which the dispatcher selects for "Vulkan" in any case).
+    {
+        string Text(string conf) => File.ReadAllText(conf).Replace("\r", "");
+        foreach (var (set, name) in new (Action, string)[] {
+                     (vm.AnimeJaNaiConf.UserSelectVulkan, "Vulkan"), (vm.AnimeJaNaiConf.UserSelectTensorRt, "TensorRT"),
+                     (vm.AnimeJaNaiConf.UserSelectDirectMl, "DirectML") })
+        {
+            set();
+            string full = Path.Combine(data, $"backend-{name}.conf");
+            vm.WriteAnimeJaNaiConf(full);
+            if (!Text(full).Contains($"backend={name}\n"))
+                throw new Exception($"Full config lacks backend={name}:\n{Text(full)}");
+            var back = vm.ReadAnimeJaNaiConf(full);
+            if (back.SelectedBackend.ToString() != name || (back.VulkanSelected ? 1 : 0) + (back.DirectMlSelected ? 1 : 0) + (back.TensorRtSelected ? 1 : 0) != 1)
+                throw new Exception($"backend={name} read back as {back.SelectedBackend}");
+            if (vm.ReadAnimeJaNaiConf(Path.Combine(data, "animejanai.conf")).SelectedBackend.ToString() != name)
+                throw new Exception($"Autosave lost backend={name}");
+            Console.WriteLine($"PASS backend={name} export/reload and autosave");
+        }
+    }
     // Held-frame reuse: [global] reuse_held_frames, on when absent (the fixture has no key).
     {
         if (!vm.AnimeJaNaiConf.ReuseHeldFrames)
