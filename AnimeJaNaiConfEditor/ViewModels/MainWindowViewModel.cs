@@ -76,12 +76,15 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         // DirectML (D3D12) is Windows-only; on Linux TensorRT is the only backend.
         public bool DirectMlAvailable => OperatingSystem.IsWindows();
-        // Vulkan (libaji's native kernels on Vulkan, opt-in) runs on DirectML's D3D11 frame
-        // pipeline, models without Vulkan kernels on DirectML itself: Windows-only for now, and
-        // offered only when the installed engine has it (aji_vk.dll beside aji.dll; players
-        // with an older libaji don't), or when the conf already selects it.
-        public bool VulkanAvailable => OperatingSystem.IsWindows() &&
-            (File.Exists(Path.Combine(DataDir, "inference", "aji_vk.dll")) || AnimeJaNaiConf?.VulkanSelected == true);
+        // Vulkan (libaji's native kernels on Vulkan, opt-in). On Windows it runs on DirectML's
+        // D3D11 frame pipeline, models without Vulkan kernels on DirectML itself; on Linux on the
+        // player's Vulkan frames (hwdec=vulkan). Offered when the installed engine has it
+        // (aji_vk.dll beside aji.dll, libaji_vk.so beside libaji.so; players with an older
+        // libaji don't), or on Windows when the conf already selects it.
+        public static bool VulkanInstalled() => File.Exists(Path.Combine(DataDir, "inference",
+            OperatingSystem.IsWindows() ? "aji_vk.dll" : "libaji_vk.so"));
+        public bool VulkanAvailable => VulkanInstalled() ||
+            (OperatingSystem.IsWindows() && AnimeJaNaiConf?.VulkanSelected == true);
 
         public static bool RifeOnDisk() =>
             Directory.Exists(Path.Combine(DataDir, "rife")) &&
@@ -176,16 +179,18 @@ namespace AnimeJaNaiConfEditor.ViewModels
             }
             else if (!DirectMlAvailable)
             {
-                // Linux has no DirectML: TensorRT is the only backend, installed or not
+                // Linux has no DirectML: TensorRT, or Vulkan where the engine has it
                 TrtSelectable = true;
-                if (AnimeJaNaiConf?.DirectMlSelected == true || AnimeJaNaiConf?.VulkanSelected == true)
+                if (AnimeJaNaiConf?.DirectMlSelected == true || (AnimeJaNaiConf?.VulkanSelected == true && !VulkanInstalled()))
                 {
                     AnimeJaNaiConf.BackendAutoFallback = false;
                     AnimeJaNaiConf.SetTensorRtSelected();
                 }
-                if (nvidia == false && ComponentManager.TensorRtTooOld.Count > 0)
+                if (AnimeJaNaiConf?.VulkanSelected == true)
+                    notice = "";
+                else if (nvidia == false && ComponentManager.TensorRtTooOld.Count > 0)
                     notice = Services.TensorRtGpus.TooOldNotice(ComponentManager.TensorRtTooOld) +
-                        " Upscaling on Linux needs TensorRT.";
+                        (VulkanInstalled() ? " Select Vulkan to upscale on it." : " Upscaling on Linux needs TensorRT.");
                 else if (!trtInstalled)
                     notice = "TensorRT is not installed - install it from the Components tab.";
             }
