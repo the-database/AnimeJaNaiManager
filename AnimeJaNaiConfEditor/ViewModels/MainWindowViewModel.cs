@@ -56,7 +56,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
             this.WhenAnyValue(x => x.ComponentManager.IsBusy).Subscribe(_ => this.RaisePropertyChanged(nameof(AllowStorageChanges)));
             this.WhenAnyValue(x => x.ComponentManager.SetupNeeded).Subscribe(_ => this.RaisePropertyChanged(nameof(ShowSetupNeeded)));
             this.WhenAnyValue(x => x.AnimeJaNaiConf.DirectMlSelected).Subscribe(_ => RaiseGpuChoice());
-            this.WhenAnyValue(x => x.AnimeJaNaiConf.VulkanSelected).Subscribe(_ => RaiseGpuChoice());
+            this.WhenAnyValue(x => x.AnimeJaNaiConf.VulkanSelected).Subscribe(_ =>
+            {
+                RaiseGpuChoice();
+                this.RaisePropertyChanged(nameof(VulkanAvailable));
+            });
             _ = LoadDxgiGpusAsync();
             _ = InitializeComponentManagerAsync();
         }
@@ -73,8 +77,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
         // DirectML (D3D12) is Windows-only; on Linux TensorRT is the only backend.
         public bool DirectMlAvailable => OperatingSystem.IsWindows();
         // Vulkan (libaji's native kernels on Vulkan, opt-in) runs on DirectML's D3D11 frame
-        // pipeline, models without Vulkan kernels on DirectML itself: Windows-only for now.
-        public bool VulkanAvailable => OperatingSystem.IsWindows();
+        // pipeline, models without Vulkan kernels on DirectML itself: Windows-only for now, and
+        // offered only when the installed engine has it (aji_vk.dll beside aji.dll; players
+        // with an older libaji don't), or when the conf already selects it.
+        public bool VulkanAvailable => OperatingSystem.IsWindows() &&
+            (File.Exists(Path.Combine(DataDir, "inference", "aji_vk.dll")) || AnimeJaNaiConf?.VulkanSelected == true);
 
         public static bool RifeOnDisk() =>
             Directory.Exists(Path.Combine(DataDir, "rife")) &&
