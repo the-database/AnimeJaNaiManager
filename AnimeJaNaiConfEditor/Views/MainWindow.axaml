@@ -317,7 +317,7 @@
                   <StackPanel Spacing="6">
                     <TextBlock TextWrapping="Wrap"><Bold>TensorRT</Bold>: Fastest option but NVIDIA only. Supports fp16 and fp32 ONNX models. fp16 models are recommended for faster performance and reduced VRAM usage without any loss in quality. The initial engine generation may require several minutes but only needs to be done once.</TextBlock>
                     <TextBlock TextWrapping="Wrap"><Bold>DirectML</Bold>: Compatible with NVIDIA, AMD, and Intel GPUs but slower than TensorRT.</TextBlock>
-                    <TextBlock TextWrapping="Wrap" IsVisible="{Binding VulkanAvailable}"><Bold>Vulkan (beta)</Bold>: Native kernels on Vulkan, for AMD and Intel GPUs: faster than DirectML on the same GPU. Models it has no kernels for run on DirectML.</TextBlock>
+                    <TextBlock TextWrapping="Wrap" IsVisible="{Binding VulkanAvailable}"><Bold>Vulkan (beta)</Bold>: Native kernels on Vulkan, for AMD and Intel GPUs: faster than DirectML on the same GPU. On Windows, models it has no kernels for run on DirectML.</TextBlock>
                   </StackPanel>
                 </ToolTip.Tip>
               </ContentControl>
