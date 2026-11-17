@@ -56,6 +56,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
             this.WhenAnyValue(x => x.ComponentManager.IsBusy).Subscribe(_ => this.RaisePropertyChanged(nameof(AllowStorageChanges)));
             this.WhenAnyValue(x => x.ComponentManager.SetupNeeded).Subscribe(_ => this.RaisePropertyChanged(nameof(ShowSetupNeeded)));
             this.WhenAnyValue(x => x.AnimeJaNaiConf.DirectMlSelected).Subscribe(_ => RaiseGpuChoice());
+            this.WhenAnyValue(x => x.AnimeJaNaiConf.VulkanSelected).Subscribe(_ =>
+            {
+                RaiseGpuChoice();
+                this.RaisePropertyChanged(nameof(VulkanAvailable));
+            });
             _ = LoadDxgiGpusAsync();
             _ = InitializeComponentManagerAsync();
         }
@@ -71,6 +76,12 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         // DirectML (D3D12) is Windows-only; on Linux TensorRT is the only backend.
         public bool DirectMlAvailable => OperatingSystem.IsWindows();
+        // Vulkan (libaji's native kernels on Vulkan, opt-in) runs on DirectML's D3D11 frame
+        // pipeline, models without Vulkan kernels on DirectML itself: Windows-only for now, and
+        // offered only when the installed engine has it (aji_vk.dll beside aji.dll; players
+        // with an older libaji don't), or when the conf already selects it.
+        public bool VulkanAvailable => OperatingSystem.IsWindows() &&
+            (File.Exists(Path.Combine(DataDir, "inference", "aji_vk.dll")) || AnimeJaNaiConf?.VulkanSelected == true);
 
         public static bool RifeOnDisk() =>
             Directory.Exists(Path.Combine(DataDir, "rife")) &&
@@ -167,7 +178,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
             {
                 // Linux has no DirectML: TensorRT is the only backend, installed or not
                 TrtSelectable = true;
-                if (AnimeJaNaiConf?.DirectMlSelected == true)
+                if (AnimeJaNaiConf?.DirectMlSelected == true || AnimeJaNaiConf?.VulkanSelected == true)
                 {
                     AnimeJaNaiConf.BackendAutoFallback = false;
                     AnimeJaNaiConf.SetTensorRtSelected();
@@ -243,7 +254,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         private sealed record GpuEntry(string Label, string Key, bool? Integrated);
 
-        private bool DirectMlChoice => AnimeJaNaiConf?.DirectMlSelected == true;
+        private bool DirectMlChoice => AnimeJaNaiConf?.DirectMlSelected == true || AnimeJaNaiConf?.VulkanSelected == true;
 
         // The GPUs the selected backend can upscale on. TensorRT: the NVIDIA GPUs, in NVML's
         // order, keyed by device UUID. DirectML: every hardware adapter, keyed by PCI slot (by
@@ -1278,6 +1289,9 @@ chain_2_rife=no";
                     case Backend.NCNN: // retired; the inference shim treats NCNN as DirectML
                         animeJaNaiConf.SetDirectMlSelected();
                         break;
+                    case Backend.Vulkan:
+                        animeJaNaiConf.SetVulkanSelected();
+                        break;
                     case Backend.TensorRT:
                     default:
                         animeJaNaiConf.SetTensorRtSelected();
@@ -1913,6 +1927,7 @@ chain_2_rife=no";
                     x => x.EnableLogging,
                     x => x.TensorRtSelected,
                     x => x.DirectMlSelected,
+                    x => x.VulkanSelected,
                     x => x.BackendAutoFallback,
                     x => x.TrtEngineSettings).Subscribe(x =>
                     {
@@ -1989,6 +2004,17 @@ chain_2_rife=no";
             set
             {
                 this.RaiseAndSetIfChanged(ref _directMlSelected, value);
+            }
+        }
+
+        private bool _vulkanSelected = false;
+        [DataMember]
+        public bool VulkanSelected
+        {
+            get => _vulkanSelected;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _vulkanSelected, value);
             }
         }
 
@@ -2178,12 +2204,21 @@ chain_2_rife=no";
         {
             TensorRtSelected = true;
             DirectMlSelected = false;
+            VulkanSelected = false;
         }
 
         public void SetDirectMlSelected()
         {
             DirectMlSelected = true;
             TensorRtSelected = false;
+            VulkanSelected = false;
+        }
+
+        public void SetVulkanSelected()
+        {
+            VulkanSelected = true;
+            TensorRtSelected = false;
+            DirectMlSelected = false;
         }
 
         public void UserSelectTensorRt()
@@ -2196,6 +2231,12 @@ chain_2_rife=no";
         {
             BackendAutoFallback = false;
             SetDirectMlSelected();
+        }
+
+        public void UserSelectVulkan()
+        {
+            BackendAutoFallback = false;
+            SetVulkanSelected();
         }
 
         private bool _backendAutoFallback;
@@ -2216,7 +2257,7 @@ chain_2_rife=no";
             set => this.RaiseAndSetIfChanged(ref _gpuSubtitles, value);
         }
 
-        public Backend SelectedBackend => DirectMlSelected ? Backend.DirectML : Backend.TensorRT;
+        public Backend SelectedBackend => VulkanSelected ? Backend.Vulkan : DirectMlSelected ? Backend.DirectML : Backend.TensorRT;
 
         // The GPU choice per backend, "" for Auto. [global] gpu_tensorrt is a Vulkan/CUDA device
         // UUID and gpu_directml a D3D11 adapter's PCI slot (pci:bb:dd.f, or its name when Windows
@@ -2955,6 +2996,7 @@ chain_2_rife=no";
     {
         TensorRT,
         DirectML,
-        NCNN
+        NCNN,
+        Vulkan
     }
 }
