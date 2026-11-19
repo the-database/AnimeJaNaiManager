@@ -21,6 +21,7 @@
     <InternalsVisibleTo Include="AnimeJaNai.AddonUi.Tests" />
     <AvaloniaResource Include="Assets\**" />
     <EmbeddedResource Include="Services\Diagnostics\capture.lua" LogicalName="AnimeJaNaiManager.Diagnostics.capture.lua" />
+    <EmbeddedResource Include="Services\PlayerSettings\player-options.json" LogicalName="AnimeJaNaiManager.PlayerSettings.player-options.json" />
   </ItemGroup>
 
   <ItemGroup>

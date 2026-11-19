@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AnimeJaNaiConfEditor.ViewModels"
+             xmlns:ps="using:AnimeJaNaiConfEditor.Services.PlayerSettings"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             x:Class="AnimeJaNaiConfEditor.Views.PlayerSettingsView"
+             x:DataType="vm:PlayerSettingsViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.optionLabel.changed">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <!-- one line, so the settings below don't move as messages come and go; errors wrap -->
+    <Style Selector="TextBlock.status">
+      <Setter Property="Opacity" Value="0.7"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+    <Style Selector="TextBlock.status.error">
+      <Setter Property="TextWrapping" Value="Wrap"/>
+      <Setter Property="Opacity" Value="1"/>
+      <Setter Property="Foreground" Value="Orange"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.icon">
+      <Setter Property="Padding" Value="6"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24" Spacing="12" MaxWidth="960" HorizontalAlignment="Left">
+      <TextBlock Text="Player Settings" FontSize="24" FontWeight="SemiBold"/>
+      <TextBlock TextWrapping="Wrap" Text="{Binding LiveText}"/>
+      <TextBlock Classes="note" TextWrapping="Wrap"
+                 Text="Settings you leave at the default are removed from mpv.conf, and everything else you wrote there stays. AnimeJaNai's own defaults in mpv-animejanai.conf are never changed."/>
+
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <TextBox x:Name="SearchBox" Text="{Binding Filter}" PlaceholderText="Search settings" MinWidth="260"/>
+        <Button Grid.Column="1" Command="{Binding OpenFile}" ToolTip.Tip="{Binding FilePath}">
+          <StackPanel Classes="row">
+            <materialIcons:MaterialIcon Kind="FileDocumentEditOutline" VerticalAlignment="Center"/>
+            <TextBlock>Open mpv.conf</TextBlock>
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="2" Command="{Binding ReloadFromDisk}" ToolTip.Tip="Read mpv.conf again, for example after editing it by hand.">
+          <StackPanel Classes="row">
+            <materialIcons:MaterialIcon Kind="Refresh" VerticalAlignment="Center"/>
+            <TextBlock>Reload</TextBlock>
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <TextBlock x:Name="Status" Classes="status" Classes.error="{Binding StatusIsError}" Text="{Binding StatusText}" ToolTip.Tip="{Binding StatusText}"/>
+
+      <ItemsControl x:Name="SectionList" ItemsSource="{Binding Sections}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PlayerSettingsSection">
+            <Expander Classes="section" IsVisible="{Binding IsVisible}" IsExpanded="{Binding IsExpanded}">
+              <Expander.Header>
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Classes="sectionTitle" Margin="0,0,20,0" Text="{Binding Name}"/>
+                  <TextBlock Grid.Column="1" Classes="summary" Text="{Binding Summary}"/>
+                </Grid>
+              </Expander.Header>
+              <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PlayerOptionViewModel">
+                    <Grid ColumnDefinitions="220,300,36,36,*" RowDefinitions="Auto,Auto" Margin="0,4" IsVisible="{Binding IsVisible}">
+                      <ContentControl Classes="hint" ToolTip.Tip="{Binding Tip}">
+                        <TextBlock Classes="optionLabel" Classes.changed="{Binding IsSet}" Text="{Binding Label}" TextWrapping="Wrap"/>
+                      </ContentControl>
+
+                      <Panel Grid.Column="1">
+                        <CheckBox IsVisible="{Binding IsFlag}" IsChecked="{Binding FlagValue}"/>
+                        <ui:FAComboBox IsVisible="{Binding IsChoice}" HorizontalAlignment="Stretch" MaxDropDownHeight="500"
+                                       ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice}">
+                          <ui:FAComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="ps:OptionChoice">
+                              <TextBlock Text="{Binding Label}"/>
+                            </DataTemplate>
+                          </ui:FAComboBox.ItemTemplate>
+                        </ui:FAComboBox>
+                        <Grid IsVisible="{Binding IsEditableChoice}" ColumnDefinitions="*,Auto">
+                          <TextBox Classes="optionText" Text="{Binding Text, UpdateSourceTrigger=LostFocus}"/>
+                          <Button Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Stretch" ToolTip.Tip="Common values" Click="ChoicesButtonClick">
+                            <materialIcons:MaterialIcon Kind="ChevronDown"/>
+                          </Button>
+                        </Grid>
+                        <Grid IsVisible="{Binding IsText}" ColumnDefinitions="*,Auto">
+                          <TextBox Classes="optionText" Text="{Binding Text, UpdateSourceTrigger=LostFocus}" PlaceholderText="{Binding Placeholder}"/>
+                          <Button Grid.Column="1" Margin="6,0,0,0" Content="Browse…" IsVisible="{Binding IsFolder}" Click="BrowseFolderClick"/>
+                        </Grid>
+                      </Panel>
+
+                      <!-- fixed columns, so the manual links line up whether or not a row is changed -->
+                      <Button Grid.Column="2" Classes="icon" HorizontalAlignment="Right" Command="{Binding Reset}" IsVisible="{Binding IsSet}"
+                              ToolTip.Tip="{Binding DefaultText, StringFormat='Back to the default. {0}'}">
+                        <materialIcons:MaterialIcon Kind="Restore"/>
+                      </Button>
+                      <Button Grid.Column="3" Classes="icon" HorizontalAlignment="Left" Command="{Binding OpenManual}" ToolTip.Tip="{Binding ManualTip}">
+                        <materialIcons:MaterialIcon Kind="OpenInNew" Opacity="0.6"/>
+                      </Button>
+                      <TextBlock Grid.Column="4" Classes="note" VerticalAlignment="Center" Margin="6,0,0,0" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                 Text="{Binding DefaultText}" IsVisible="{Binding IsSet}" ToolTip.Tip="{Binding DefaultText}"/>
+
+                      <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="Orange"
+                                 Text="{Binding Error}" IsVisible="{Binding HasError}"/>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Expander>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Classes="note" TextWrapping="Wrap" Margin="0,8,0,0"
+                 Text="Anything not listed here can still be set by hand in mpv.conf, below the line profile = animejanai. The (?) explains each setting, and the arrow opens mpv's manual for it."/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

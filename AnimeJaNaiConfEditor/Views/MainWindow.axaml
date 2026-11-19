@@ -186,7 +186,7 @@
   </Design.DataContext>
 
   <TabControl x:Name="MainTabs" SelectedIndex="{Binding SelectedTabIndex}" Padding="10,4,10,10">
-  <TabItem Header="Profiles">
+  <TabItem Header="Profiles" x:Name="ProfilesTab">
   <Grid x:Name="ProfilesGrid" RowDefinitions="*">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="260" MinWidth="44" MaxWidth="420" />
@@ -766,7 +766,10 @@
   </TabItem>
 
 
-  <TabItem Header="Components">
+  <TabItem Header="Player" x:Name="PlayerTab">
+    <views:PlayerSettingsView x:Name="PlayerPanel" DataContext="{Binding PlayerSettings}"/>
+  </TabItem>
+  <TabItem Header="Components" x:Name="ComponentsTab">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <StackPanel Margin="24" Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
         <TextBlock Text="{Binding ComponentManager.GpuText}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
@@ -878,7 +881,7 @@
   <TabItem Header="Addons" x:Name="AddonsTab">
     <views:AddonsView x:Name="AddonPanel"/>
   </TabItem>
-  <TabItem Header="Troubleshooting">
+  <TabItem Header="Troubleshooting" x:Name="TroubleshootingTab">
     <views:DiagnosticsView x:Name="DiagnosticsPanel"/>
   </TabItem>
   </TabControl>

@@ -33,14 +33,21 @@ namespace AnimeJaNaiConfEditor
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow
+                var window = new MainWindow
                 {
                     DataContext = new MainWindowViewModel(),
                 };
+                desktop.MainWindow = window;
+                window.ApplyLaunchArgs(Program.StartupArgs);
 
                 // When another launch (e.g. a repeated Ctrl+E from mpv) signals this instance,
-                // bring the existing window to the front instead of opening a new one.
-                Program.ActivationRequested += () => BringToFront(desktop.MainWindow);
+                // bring the existing window to the front instead of opening a new one, on the tab
+                // and for the player that launch asked for.
+                Program.ActivationRequested += args =>
+                {
+                    window.ApplyLaunchArgs(args);
+                    BringToFront(window);
+                };
             }
 
             base.OnFrameworkInitializationCompleted();

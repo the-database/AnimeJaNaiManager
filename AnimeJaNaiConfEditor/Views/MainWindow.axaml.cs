@@ -1,4 +1,5 @@
 using AnimeJaNaiConfEditor.Services;
+using AnimeJaNaiConfEditor.Services.PlayerSettings;
 using AnimeJaNaiConfEditor.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
@@ -35,6 +36,54 @@ namespace AnimeJaNaiConfEditor.Views
             this.FindControl<AddonsView>("AddonPanel")?.ProtectUnsavedSettingsOnClose(this);
             Closing += MainWindow_Closing;
             Opened += MainWindow_Opened;
+            if (this.FindControl<TabControl>("MainTabs") is { } tabs)
+            {
+                tabs.SelectionChanged += (_, e) =>
+                {
+                    // the user may have edited mpv.conf by hand while another tab was open
+                    if (e.Source == tabs && tabs.SelectedItem is TabItem { Name: "PlayerTab" } && DataContext is MainWindowViewModel vm)
+                        vm.PlayerSettings.ReloadFromDisk();
+                };
+            }
+        }
+
+        private long? _pendingOwner;
+        private bool _opened;
+
+        // --page, --player-ipc and --owner-window, from this launch or a later one.
+        public void ApplyLaunchArgs(LaunchArgs args)
+        {
+            if (args.PlayerIpc is { } ipc) PlayerIpc.Endpoint = ipc;
+            if (args.Page is { } page) SelectPage(page);
+            if (args.OwnerWindow is { } owner)
+            {
+                if (_opened) SetOwner(owner);
+                else _pendingOwner = owner;
+            }
+        }
+
+        // Page names for --page; an unknown or hidden page leaves the tab as it is.
+        public bool SelectPage(string page)
+        {
+            string? name = page switch
+            {
+                "profiles" => "ProfilesTab",
+                "player" => "PlayerTab",
+                "components" => "ComponentsTab",
+                "addons" => "AddonsTab",
+                "troubleshooting" or "diagnostics" => "TroubleshootingTab",
+                _ => null,
+            };
+            if (name is null || this.FindControl<TabItem>(name) is not { IsVisible: true } tab ||
+                this.FindControl<TabControl>("MainTabs") is not { } tabs)
+                return false;
+            tabs.SelectedItem = tab;
+            return true;
+        }
+
+        private void SetOwner(long owner)
+        {
+            if (TryGetPlatformHandle()?.Handle is { } handle) OwnerWindow.Set(handle, owner);
         }
 
         private void RefreshAddonSupport()
@@ -49,6 +98,12 @@ namespace AnimeJaNaiConfEditor.Views
 
         private async void MainWindow_Opened(object? sender, EventArgs e)
         {
+            _opened = true;
+            if (_pendingOwner is { } owner)
+            {
+                _pendingOwner = null;
+                SetOwner(owner);
+            }
             if (DataContext is MainWindowViewModel vm &&
                 this.FindControl<Grid>("ProfilesGrid") is { } grid)
             {

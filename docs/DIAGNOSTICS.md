@@ -71,13 +71,14 @@ This is not a guarantee of anonymity: file names, free-form notes and unusual
 custom credentials can remain. Open and review the ZIP before posting publicly.
 
 The recorder keeps the existing renderer, backend, profiles and user scripts.
-It requests a separate player instance, extra logging, a private control pipe
+It starts the player itself (`player_path` from `manifest.json`, else `mpv.exe`, or
+`mpv/mpv` on Linux, never mpv.net), so it is a separate player instance, with extra logging, a private control pipe
 and a metadata-only Lua probe. It does not copy video frames to the CPU, toggle
 HDR, disable Vulkan layers or change saved settings. Normal player behavior,
 such as saving playback position or building an engine, still applies. Logging
 adds some overhead, so report whether a performance problem also occurs normally.
 
-Live recording is available on Windows with mpv.net or mpv. Other platforms can
+Live recording is available on Windows. Other platforms can
 save a snapshot, but Windows-specific hardware information is unavailable. A report is diagnostic
 evidence, not an automatic determination of the cause.
 
