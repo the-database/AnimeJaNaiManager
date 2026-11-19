@@ -79,13 +79,16 @@ const string Shipped = """
 
     """;
 
-// A portable_config folder with these two files; returns the loaded config.
-PlayerConfig Fixture(string mpvConf, string? managed = Managed, string newline = "\n", bool bom = false)
+// A portable_config folder with these two files; returns the loaded config. The literals above
+// have the checkout's line endings (CRLF on a Windows checkout), so they are written with
+// `newline`; null keeps a real file's own.
+PlayerConfig Fixture(string mpvConf, string? managed = Managed, string? newline = "\n", bool bom = false)
 {
+    string Lines(string text) => newline is null ? text : text.Replace("\r\n", "\n").Replace("\n", newline);
     string dir = Path.Combine(scratch, Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(dir);
-    if (managed != null) File.WriteAllText(Path.Combine(dir, PlayerConfig.ManagedFileName), managed.Replace("\n", newline));
-    if (mpvConf.Length > 0 || bom) File.WriteAllText(Path.Combine(dir, "mpv.conf"), mpvConf.Replace("\n", newline), new UTF8Encoding(bom));
+    if (managed != null) File.WriteAllText(Path.Combine(dir, PlayerConfig.ManagedFileName), Lines(managed));
+    if (mpvConf.Length > 0 || bom) File.WriteAllText(Path.Combine(dir, "mpv.conf"), Lines(mpvConf), new UTF8Encoding(bom));
     return PlayerConfig.Load(catalog, dir);
 }
 string Text(PlayerConfig c) => File.ReadAllText(c.MpvConfPath);
@@ -287,7 +290,7 @@ foreach (string nl in new[] { "\n", "\r\n" })
 if (package != null)
 {
     // The real package files: unchanged round trip and a set/reset cycle
-    var c = Fixture(File.ReadAllText(Path.Combine(package, "mpv.conf")), File.ReadAllText(Path.Combine(package, PlayerConfig.ManagedFileName)));
+    var c = Fixture(File.ReadAllText(Path.Combine(package, "mpv.conf")), File.ReadAllText(Path.Combine(package, PlayerConfig.ManagedFileName)), newline: null);
     string original = Text(c);
     Check(c.Document.ToString() == original && c.HasInclude && c.HasProfileLine && c.ManagedFound, "package mpv.conf layout not recognised");
     var defaults = catalog.Options.Where(o => !o.SameValue(c.BaseValue(o), o.Default)).Select(o => $"{o.Name}={c.BaseValue(o)}");
