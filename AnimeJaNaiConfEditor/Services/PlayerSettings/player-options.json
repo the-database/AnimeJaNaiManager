@@ -1,0 +1,261 @@
+{
+  "manual": "https://mpv.io/manual/master/#options-",
+  "sections": [ "Video", "Audio", "Subtitles", "Window", "Screenshots", "Cache", "Language" ],
+  "builtin_profiles": {
+    "high-quality": {
+      "scale": "ewa_lanczossharp",
+      "scale-antiring": "0.6",
+      "hdr-peak-percentile": "99.995",
+      "hdr-contrast-recovery": "0.30"
+    }
+  },
+  "options": [
+    {
+      "option": "gpu-api", "section": "Video", "label": "Graphics API", "type": "choice", "default": "", "live": false,
+      "choices": [
+        { "value": "vulkan,auto", "label": "Vulkan, else automatic" },
+        { "value": "auto", "label": "Automatic" },
+        { "value": "vulkan", "label": "Vulkan" },
+        { "value": "d3d11", "label": "Direct3D 11", "os": "windows" },
+        { "value": "opengl", "label": "OpenGL" }
+      ],
+      "help": "Which graphics API draws the video. Try Automatic or Direct3D 11 if playback shows a black window or crashes."
+    },
+    {
+      "option": "video-sync", "section": "Video", "label": "Video sync", "type": "choice", "default": "audio", "live": true,
+      "choices": [
+        { "value": "audio", "label": "Audio clock" },
+        { "value": "display-resample", "label": "Display (resample audio)" },
+        { "value": "display-resample-vdrop", "label": "Display (resample audio, drop video)" },
+        { "value": "display-tempo", "label": "Display (change audio tempo)" },
+        { "value": "display-vdrop", "label": "Display (drop or repeat video frames)" },
+        { "value": "display-adrop", "label": "Display (drop or repeat audio)" },
+        { "value": "display-desync", "label": "Display, no audio sync" },
+        { "value": "desync", "label": "No sync" }
+      ],
+      "help": "What paces the frames. A display mode times frames to the screen's refresh rate, which smooth motion needs."
+    },
+    {
+      "option": "interpolation", "section": "Video", "label": "Smooth motion", "type": "flag", "default": "no", "live": true,
+      "help": "Blends neighbouring frames so motion doesn't judder when the frame rate doesn't divide the refresh rate. Needs a display video sync mode."
+    },
+    {
+      "option": "scale", "section": "Video", "label": "Upscaling filter", "type": "choice", "default": "lanczos", "live": true,
+      "choices": [ "bilinear", "spline36", "lanczos", "ewa_lanczos", "ewa_lanczossharp", "ewa_lanczossoft", "mitchell", "catmull_rom" ],
+      "help": "The filter that enlarges the picture after AI upscaling when the window is still bigger than the video."
+    },
+    {
+      "option": "dscale", "section": "Video", "label": "Downscaling filter", "type": "choice", "default": "hermite", "live": true,
+      "choices": [ "hermite", "bilinear", "mitchell", "catmull_rom", "spline36", "lanczos", "ewa_lanczos", "ewa_lanczossharp" ],
+      "help": "The filter that shrinks the picture when the upscaled video is bigger than the window, for example 4K output on a 1440p screen."
+    },
+    {
+      "option": "deband", "section": "Video", "label": "Debanding", "type": "flag", "default": "no", "live": true,
+      "help": "Smooths colour banding in gradients such as skies and dark scenes."
+    },
+    {
+      "option": "deinterlace", "section": "Video", "label": "Deinterlacing", "type": "choice", "default": "no", "live": true,
+      "choices": [ { "value": "no", "label": "Off" }, { "value": "auto", "label": "Automatic" }, { "value": "yes", "label": "Always" } ],
+      "help": "Removes the comb lines of interlaced video, common on DVDs and TV recordings. Automatic only acts on video marked as interlaced."
+    },
+    {
+      "option": "target-colorspace-hint", "section": "Video", "label": "HDR passthrough", "type": "choice", "default": "auto", "live": true,
+      "choices": [ { "value": "auto", "label": "Automatic" }, { "value": "yes", "label": "On" }, { "value": "no", "label": "Off" } ],
+      "help": "Tells the display the video's colour space so an HDR screen can show HDR video as HDR. Off maps HDR to SDR in the player."
+    },
+    {
+      "option": "tone-mapping", "section": "Video", "label": "HDR tone mapping", "type": "choice", "default": "auto", "live": true,
+      "choices": [ "auto", "bt.2390", "bt.2446a", "spline", "st2094-40", "st2094-10", "hable", "mobius", "reinhard", "clip", "gamma", "linear" ],
+      "help": "How HDR brightness is squeezed into what the screen can show, when the screen can't show the full range."
+    },
+    {
+      "option": "hr-seek", "section": "Video", "label": "Precise seeking", "type": "choice", "default": "default", "live": true,
+      "choices": [
+        { "value": "default", "label": "Jumps to a time, all seeks in audio files" },
+        { "value": "absolute", "label": "Jumps to a time" },
+        { "value": "yes", "label": "All seeks" },
+        { "value": "no", "label": "Never (nearest keyframe)" }
+      ],
+      "help": "Whether a seek lands on the exact frame or on the nearest keyframe, which is faster but less exact."
+    },
+
+    {
+      "option": "volume", "section": "Audio", "label": "Start volume", "type": "number", "default": "100", "min": 0, "max": 1000, "live": true,
+      "help": "The volume, in percent, the player starts at."
+    },
+    {
+      "option": "volume-max", "section": "Audio", "label": "Maximum volume", "type": "number", "default": "130", "min": 100, "max": 1000, "live": true,
+      "help": "How far, in percent, the volume can be raised. Above 100 boosts quiet audio and can distort it."
+    },
+    {
+      "option": "audio-channels", "section": "Audio", "label": "Speaker channels", "type": "choice", "editable": true, "default": "auto-safe", "live": true,
+      "choices": [ { "value": "auto-safe", "label": "Automatic (safe)" }, { "value": "auto", "label": "Automatic" }, "stereo", "5.1", "7.1" ],
+      "help": "The channel layout sent to your speakers. Stereo downmixes surround sound for headphones and TV speakers."
+    },
+    {
+      "option": "audio-exclusive", "section": "Audio", "label": "Exclusive audio", "type": "flag", "default": "no", "live": true,
+      "help": "Takes the audio device for the player alone, bypassing the system mixer. Other apps go silent while it plays."
+    },
+    {
+      "option": "audio-spdif", "section": "Audio", "label": "Passthrough codecs", "type": "text", "default": "", "live": true, "placeholder": "e.g. ac3,dts,eac3,truehd,dts-hd",
+      "help": "Comma-separated codecs to send undecoded to an AV receiver over HDMI or S/PDIF. Leave empty to decode everything in the player."
+    },
+    {
+      "option": "audio-pitch-correction", "section": "Audio", "label": "Keep pitch when speeding up", "type": "flag", "default": "yes", "live": true,
+      "help": "Keeps voices at their normal pitch when playing faster or slower than normal."
+    },
+
+    {
+      "option": "sub-auto", "section": "Subtitles", "label": "Load external subtitles", "type": "choice", "default": "exact", "live": true,
+      "choices": [
+        { "value": "exact", "label": "Same file name" },
+        { "value": "fuzzy", "label": "File name contains the video's name" },
+        { "value": "all", "label": "All in the folder" },
+        { "value": "no", "label": "Never" }
+      ],
+      "help": "Which subtitle files next to the video load with it. Applies from the next video."
+    },
+    {
+      "option": "sub-font", "section": "Subtitles", "label": "Font", "type": "text", "default": "sans-serif", "live": true,
+      "help": "The font for plain-text subtitles such as SRT. Styled (ASS) subtitles keep their own fonts."
+    },
+    {
+      "option": "sub-font-size", "section": "Subtitles", "label": "Font size", "type": "number", "default": "38", "min": 1, "max": 9000, "live": true,
+      "help": "Text size of plain-text subtitles, in scaled pixels at a 720-line window height."
+    },
+    {
+      "option": "sub-scale", "section": "Subtitles", "label": "Scale", "type": "number", "default": "1", "min": 0, "max": 100, "live": true,
+      "help": "Makes all subtitles bigger or smaller: 1 is normal size, 1.2 is 20% bigger."
+    },
+    {
+      "option": "sub-pos", "section": "Subtitles", "label": "Vertical position", "type": "number", "default": "100", "min": 0, "max": 150, "live": true,
+      "help": "Where subtitles sit, in percent of the window height: 100 is the bottom, lower values move them up."
+    },
+    {
+      "option": "sub-ass-override", "section": "Subtitles", "label": "Style override", "type": "choice", "default": "scale", "live": true,
+      "choices": [
+        { "value": "scale", "label": "Only the scale" },
+        { "value": "no", "label": "None (keep the file's styles)" },
+        { "value": "yes", "label": "Basic styles" },
+        { "value": "force", "label": "All styles" },
+        { "value": "strip", "label": "Strip all styling" }
+      ],
+      "help": "How much of your subtitle settings apply to styled (ASS) subtitles, which bring their own fonts and positions."
+    },
+    {
+      "option": "blend-subtitles", "section": "Subtitles", "label": "Blend into the video", "type": "choice", "default": "no", "live": true,
+      "choices": [
+        { "value": "video", "label": "Yes, at video resolution" },
+        { "value": "yes", "label": "Yes, at window resolution" },
+        { "value": "no", "label": "No (sharper)" }
+      ],
+      "help": "Draws subtitles into the video frame. No draws them separately at screen resolution, which is sharper but can cost speed."
+    },
+
+    {
+      "option": "fullscreen", "aliases": [ "fs" ], "section": "Window", "label": "Start in fullscreen", "type": "flag", "default": "no", "live": true,
+      "help": "Opens the player in fullscreen. Changing it here also switches the open player."
+    },
+    {
+      "option": "ontop", "section": "Window", "label": "Always on top", "type": "flag", "default": "no", "live": true,
+      "help": "Keeps the player window above other windows."
+    },
+    {
+      "option": "border", "section": "Window", "label": "Window border and title bar", "type": "flag", "default": "yes", "live": true,
+      "help": "Shows the window frame. Off gives a borderless window."
+    },
+    {
+      "option": "autofit-larger", "section": "Window", "label": "Largest start size", "type": "text", "default": "", "live": true, "placeholder": "e.g. 90%x90%",
+      "help": "Shrinks the window to fit this size when a video would open bigger, as a percent of the screen (90%x90%) or pixels (1600x900)."
+    },
+    {
+      "option": "snap-window", "section": "Window", "label": "Snap to screen edges", "type": "flag", "default": "no", "live": true, "os": "windows",
+      "help": "Snaps the window to the screen edges and other windows when you drag it."
+    },
+    {
+      "option": "cursor-autohide", "section": "Window", "label": "Hide the mouse pointer after", "type": "choice", "editable": true, "default": "1000", "live": true,
+      "choices": [ { "value": "500", "label": "500 ms" }, { "value": "1000", "label": "1000 ms" }, { "value": "2000", "label": "2000 ms" }, { "value": "3000", "label": "3000 ms" }, { "value": "no", "label": "Never" }, { "value": "always", "label": "Always hidden" } ],
+      "help": "Milliseconds without mouse movement before the pointer hides over the video."
+    },
+    {
+      "option": "keep-open", "section": "Window", "label": "At the end", "type": "choice", "default": "no", "live": true,
+      "choices": [
+        { "value": "no", "label": "Play the next file or close" },
+        { "value": "yes", "label": "Stay on the last frame of the playlist" },
+        { "value": "always", "label": "Stay on the last frame of every file" }
+      ],
+      "help": "What the player does when a video ends."
+    },
+    {
+      "option": "save-position-on-quit", "section": "Window", "label": "Resume where you left off", "type": "flag", "default": "no", "live": true,
+      "help": "Remembers the playback position when you close the player and continues there next time."
+    },
+
+    {
+      "option": "screenshot-format", "section": "Screenshots", "label": "Format", "type": "choice", "default": "jpg", "live": true,
+      "choices": [ { "value": "png", "label": "PNG (lossless)" }, { "value": "jpg", "label": "JPEG" }, { "value": "webp", "label": "WebP" }, { "value": "jxl", "label": "JPEG XL" }, { "value": "avif", "label": "AVIF" } ],
+      "help": "The image format screenshots are saved in."
+    },
+    {
+      "option": "screenshot-dir", "aliases": [ "screenshot-directory" ], "section": "Screenshots", "label": "Folder", "type": "folder", "default": "", "live": true,
+      "help": "Where screenshots are saved. ~~/ is the player's portable_config folder."
+    },
+    {
+      "option": "screenshot-template", "section": "Screenshots", "label": "File name", "type": "text", "default": "mpv-shot%n", "live": true,
+      "help": "The screenshot file name: %F is the video's name, %P the playback time, %n a running number."
+    },
+    {
+      "option": "screenshot-jpeg-quality", "section": "Screenshots", "label": "JPEG quality", "type": "number", "integer": true, "default": "90", "min": 0, "max": 100, "live": true,
+      "help": "Quality of JPEG screenshots, 0 to 100. Higher is better and larger."
+    },
+    {
+      "option": "screenshot-png-compression", "section": "Screenshots", "label": "PNG compression", "type": "number", "integer": true, "default": "7", "min": 0, "max": 9, "live": true,
+      "help": "PNG compression level, 0 to 9. Higher makes smaller files but takes longer; the picture is the same."
+    },
+
+    {
+      "option": "cache", "section": "Cache", "label": "Cache", "type": "choice", "default": "auto", "live": true,
+      "choices": [ { "value": "auto", "label": "Network streams only" }, { "value": "yes", "label": "Always" }, { "value": "no", "label": "Never" } ],
+      "help": "Reads ahead into memory so playback doesn't stall on slow disks or networks."
+    },
+    {
+      "option": "cache-secs", "section": "Cache", "label": "Read ahead (seconds)", "type": "number", "default": "3600000", "min": 0, "live": true,
+      "help": "How many seconds ahead to buffer, within the memory limit below."
+    },
+    {
+      "option": "demuxer-max-bytes", "section": "Cache", "label": "Memory for reading ahead", "type": "bytes", "default": "150MiB", "live": true, "placeholder": "e.g. 768MiB",
+      "help": "Most memory the cache uses for what comes next, such as 768MiB or 2GiB."
+    },
+    {
+      "option": "demuxer-max-back-bytes", "section": "Cache", "label": "Memory for seeking back", "type": "bytes", "default": "50MiB", "live": true, "placeholder": "e.g. 384MiB",
+      "help": "Most memory kept of what already played, so seeking back is instant."
+    },
+    {
+      "option": "cache-pause", "section": "Cache", "label": "Pause while buffering", "type": "flag", "default": "yes", "live": true,
+      "help": "Pauses when the cache runs empty and continues once enough is buffered."
+    },
+
+    {
+      "option": "alang", "section": "Language", "label": "Audio languages", "type": "text", "default": "", "live": true, "placeholder": "e.g. jpn,ja",
+      "help": "Preferred audio languages, comma-separated, first choice first. Applies from the next video."
+    },
+    {
+      "option": "slang", "section": "Language", "label": "Subtitle languages", "type": "text", "default": "", "live": true, "placeholder": "e.g. eng,en",
+      "help": "Preferred subtitle languages, comma-separated, first choice first. Applies from the next video."
+    },
+    {
+      "option": "subs-with-matching-audio", "section": "Language", "label": "Subtitles when audio matches", "type": "choice", "default": "yes", "live": true,
+      "choices": [ { "value": "yes", "label": "Show" }, { "value": "forced", "label": "Only forced subtitles" }, { "value": "no", "label": "Hide" } ],
+      "help": "Whether to show subtitles when the audio is already in a subtitle language you prefer."
+    },
+    {
+      "option": "subs-match-os-language", "section": "Language", "label": "Use the system language", "type": "flag", "default": "yes", "live": true,
+      "help": "Picks subtitles in your system's language when no subtitle language is set."
+    },
+    {
+      "option": "subs-fallback", "section": "Language", "label": "No subtitles in my languages", "type": "choice", "default": "default", "live": true,
+      "choices": [ { "value": "default", "label": "Show the file's default track" }, { "value": "yes", "label": "Show any track" }, { "value": "no", "label": "Show none" } ],
+      "help": "Which subtitles to show when none match your preferred languages."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+name: Player settings checks
+on:
+  pull_request:
+    paths:
+      - "AnimeJaNaiConfEditor/Services/PlayerSettings/**"
+      - "AnimeJaNaiConfEditor/Services/LaunchArgs.cs"
+      - "AnimeJaNaiConfEditor/ViewModels/PlayerSettingsViewModel.cs"
+      - "tests/PlayerSettings/**"
+      - ".github/workflows/player-settings.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+      # Without a player (--mpv) the catalog-against-mpv and live IPC checks are skipped.
+      - run: dotnet run --project tests/PlayerSettings -c Release

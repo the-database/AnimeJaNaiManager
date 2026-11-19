@@ -12,17 +12,44 @@ namespace AnimeJaNaiConfEditor.Services.Diagnostics;
 
 public static class SupportCapture
 {
+    // The player itself, not its launcher: manifest.json's player_path (relative to the install
+    // root), else mpv.exe / mpv/mpv. Started directly, it is always a process of its own, so a hung
+    // startup can be stopped without touching an already-running player.
+    public static string PlayerPath(string root)
+    {
+        try
+        {
+            string manifest = Path.Combine(root, "manifest.json");
+            if (File.Exists(manifest))
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(manifest));
+                if (document.RootElement.TryGetProperty("player_path", out var value) &&
+                    value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 } relative)
+                {
+                    string path = Path.GetFullPath(Path.Combine(root, relative));
+                    if (File.Exists(path)) return path;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException) { }
+        return Path.Combine(root, OperatingSystem.IsWindows() ? "mpv.exe" : Path.Combine("mpv", "mpv"));
+    }
+
     public static ProcessStartInfo LaunchInfo(SupportReport report, string pipe)
     {
-        string player = Path.Combine(report.Root, "mpvnet.exe");
-        bool mpvnet = File.Exists(player);
-        if (!mpvnet) player = Path.Combine(report.Root, OperatingSystem.IsWindows() ? "mpv.exe" : "mpv");
+        string player = PlayerPath(report.Root);
         if (!File.Exists(player)) throw new FileNotFoundException("The player was not found beside this Manager. Run Manager from your AnimeJaNai installation.", player);
         var info = new ProcessStartInfo(player) { WorkingDirectory = report.Root, UseShellExecute = false,
             RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-        // mpv.net is normally single-instance. The test must own its process so a
-        // hung startup can be stopped without touching an already-running player.
-        if (mpvnet) info.ArgumentList.Add("--process-instance=multi");
+        // mpv finds portable_config only beside its own exe (Windows); a player in a subfolder
+        // (Linux mpv/mpv) gets it, and the bundled libraries, the way the launcher passes them.
+        string config = Path.Combine(report.Root, "portable_config");
+        if (!string.Equals(Path.GetDirectoryName(player), report.Root.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) &&
+            Directory.Exists(config))
+            info.ArgumentList.Add("--config-dir=" + config);
+        if (OperatingSystem.IsLinux())
+            info.Environment["LD_LIBRARY_PATH"] = string.Join(':', new[] { Path.GetDirectoryName(player)!,
+                Path.Combine(report.Root, "animejanai", "inference"), Environment.GetEnvironmentVariable("LD_LIBRARY_PATH") ?? "" }.Where(p => p.Length > 0));
         info.ArgumentList.Add("--log-file=" + Path.Combine(report.Work, "player.log"));
         info.ArgumentList.Add("--msg-level=all=v");
         info.ArgumentList.Add("--input-ipc-server=" + (OperatingSystem.IsWindows() ? @"\\.\pipe\" + pipe : pipe));
@@ -55,9 +82,8 @@ public static class SupportCapture
             process.Start(); launched = true;
             stdout = DrainAsync(process.StandardOutput, Path.Combine(report.Work, "stdout.log"));
             stderr = DrainAsync(process.StandardError, Path.Combine(report.Work, "vulkan-loader.log"));
-            // mpv.net applies list-append arguments after libmpv initializes,
-            // so --scripts-append does not execute the added script. Load it
-            // through our private IPC endpoint without replacing user scripts.
+            // Load the script through our private IPC endpoint rather than
+            // --scripts-append, so the user's scripts stay as they are.
             probe = LoadProbeAsync(pipe, script, stop.Token);
             var timer = Stopwatch.StartNew();
             while (!process.HasExited)

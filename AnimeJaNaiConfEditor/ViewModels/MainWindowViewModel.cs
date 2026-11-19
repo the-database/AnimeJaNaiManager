@@ -430,6 +430,11 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         public ComponentManagerViewModel ComponentManager { get; } = new();
 
+        // Built when the Player tab first binds, from portable_config next to the player.
+        private PlayerSettingsViewModel? _playerSettings;
+        public PlayerSettingsViewModel PlayerSettings =>
+            _playerSettings ??= new PlayerSettingsViewModel(Path.Combine(RootDir, "portable_config"));
+
         private int _selectedTabIndex;
         public int SelectedTabIndex
         {
@@ -445,7 +450,8 @@ namespace AnimeJaNaiConfEditor.ViewModels
             }
         }
 
-        private const int ComponentsTabIndex = 1;
+        // Profiles, Player, Components, Addons, Troubleshooting
+        private const int ComponentsTabIndex = 2;
 
         // The setup banner, unless the TensorRT packs only look missing because their folder is
         // (known once storage has been read, right after the first component refresh).

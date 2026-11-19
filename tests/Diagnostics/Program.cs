@@ -107,18 +107,34 @@ using (var zip = ZipFile.OpenRead(destination))
 Console.WriteLine("PASS bundle contents, redaction, valid JSON, log limits, initial/final config snapshots");
 Console.WriteLine("PASS current playback markers after forward/backward seeks, numbered history and unavailable position");
 
-// Use the test apphost as mpvnet.exe. Its dependencies stay beside it.
-foreach (string file in Directory.GetFiles(AppContext.BaseDirectory)) File.Copy(file, Path.Combine(root, Path.GetFileName(file)));
+// Use the test apphost as the player (mpv.exe, and mpv/mpv on Linux). Its dependencies stay
+// beside it. An mpvnet.exe left by an upgraded install must not be preferred.
+string player = Path.Combine(root, OperatingSystem.IsWindows() ? "mpv.exe" : Path.Combine("mpv", "mpv"));
+Directory.CreateDirectory(Path.GetDirectoryName(player)!);
+foreach (string file in Directory.GetFiles(AppContext.BaseDirectory)) File.Copy(file, Path.Combine(Path.GetDirectoryName(player)!, Path.GetFileName(file)));
+File.Copy(Environment.ProcessPath!, player);
 File.Copy(Environment.ProcessPath!, Path.Combine(root, "mpvnet.exe"));
 var info = SupportCapture.LaunchInfo(report, "test-pipe");
-Check(info.ArgumentList.Contains("--process-instance=multi"), "Single-instance forwarding was not disabled");
+Check(info.FileName == player, "Recorder did not start the player: " + info.FileName);
+Check(!info.ArgumentList.Contains("--process-instance=multi"), "mpv.net-only argument passed to mpv");
 Check(!info.ArgumentList.Any(a => a.Contains("no-config") || a.Contains("gpu-api=")), "Recorder changed reproduction settings");
-Console.WriteLine("PASS independent player command preserves renderer/config settings");
+Check(OperatingSystem.IsWindows() != info.ArgumentList.Contains("--config-dir=" + config), "portable_config not passed to a player outside the install root");
+// manifest.json's player_path wins; a player outside the root is given portable_config
+string manifestPlayer = Path.Combine(root, "bin", Path.GetFileName(player));
+Directory.CreateDirectory(Path.GetDirectoryName(manifestPlayer)!);
+File.Copy(player, manifestPlayer);
+File.WriteAllText(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(new { player_path = "bin/" + Path.GetFileName(player) }));
+info = SupportCapture.LaunchInfo(report, "test-pipe");
+Check(info.FileName == manifestPlayer && info.ArgumentList.Contains("--config-dir=" + config), "manifest player_path was not used");
+File.WriteAllText(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(new { player_path = "missing/player.exe" }));
+Check(SupportCapture.LaunchInfo(report, "test-pipe").FileName == player, "A missing player_path did not fall back");
+File.Delete(Path.Combine(root, "manifest.json"));
+Console.WriteLine("PASS player from manifest player_path or the default, preserving renderer/config settings");
 
 foreach (bool hang in new[] { false, true })
 {
     Environment.SetEnvironmentVariable("AJN_TEST_HANG", hang ? "1" : null);
-    using var unrelated = Process.Start(new ProcessStartInfo(Path.Combine(root, "mpvnet.exe")) {
+    using var unrelated = Process.Start(new ProcessStartInfo(player) {
         UseShellExecute = false, CreateNoWindow = true, ArgumentList = { "--log-file=" + Path.Combine(fixture, "other.log"), "--input-ipc-server=" + Guid.NewGuid().ToString("N") }
     })!;
     try

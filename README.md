@@ -1,8 +1,8 @@
 # AnimeJaNai Manager
 
-Manager for [mpv-AnimeJaNai](https://github.com/the-database/mpv-AnimeJaNai): edit upscaling profiles and chains, and install or remove hardware-specific components (TensorRT runtime, per-GPU kernel packs, RIFE interpolation models) with recommendations based on the detected GPU.
+Manager for [mpv-AnimeJaNai](https://github.com/the-database/mpv-AnimeJaNai): edit upscaling profiles and chains, change common player settings (saved to your `mpv.conf`, applied right away when opened from the player), and install or remove hardware-specific components (TensorRT runtime, per-GPU kernel packs, RIFE interpolation models) with recommendations based on the detected GPU.
 
-Formerly AnimeJaNaiConfEditor; the executable is `AnimeJaNaiManager.exe` and ships at the install root next to `mpvnet.exe`.
+Formerly AnimeJaNaiConfEditor; the executable is `AnimeJaNaiManager.exe` and ships at the install root next to the player.
 
 ## Experimental automatic display refresh
 
